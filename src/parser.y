@@ -129,8 +129,8 @@ exp:              "nil"
 |                 functiondef
 |                 prefixexp
 |                 tableconstructor
-|                 exp binop exp
-|                 unop exp
+|                 binop
+|                 unop
 ;
 
 numeral:          INTCONST
@@ -188,33 +188,33 @@ fieldsep:         ","
 |                 ";"
 ;
 
-binop:            "+"
-|                 "-"
-|                 "*"
-|                 "/"
-|                 "//"
-|                 "^"
-|                 "%"
-|                 "&"
-|                 "~"
-|                 "|"
-|                 ">>"
-|                 "<<"
-|                 ".."
-|                 "<"
-|                 "<="
-|                 ">"
-|                 ">="
-|                 "=="
-|                 "~="
-|                 "and"
-|                 "or"
+binop:            exp "+" exp
+|                 exp "-" exp
+|                 exp "*" exp
+|                 exp "/" exp
+|                 exp "//" exp
+|                 exp "^" exp
+|                 exp "%" exp
+|                 exp "&" exp
+|                 exp "~" exp
+|                 exp "|" exp
+|                 exp ">>" exp
+|                 exp "<<" exp
+|                 exp ".." exp
+|                 exp "<" exp
+|                 exp "<=" exp
+|                 exp ">" exp
+|                 exp ">=" exp
+|                 exp "==" exp
+|                 exp "~=" exp
+|                 exp "and" exp
+|                 exp "or" exp
 ;
 
-unop:             "-"   %prec "not"
-|                 "not"
-|                 "#"
-|                 "~"   %prec "not"
+unop:             "-" exp   %prec "not"
+|                 "not" exp
+|                 "#" exp
+|                 "~" exp  %prec "not"
 ;
 
 %%
