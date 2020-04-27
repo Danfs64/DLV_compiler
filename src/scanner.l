@@ -70,20 +70,19 @@ ignore       [[:space:]]+
 %%
 
 {ignore}  {}
-"--"      {strcpy(strbuf, yytext); BEGIN(COMMENT);}
+--      {BEGIN(COMMENT);}
 
 <COMMENT>{
-\[=*\[     {n_equals=strnequals(); BEGIN(LB_COMMENT);}
+\[=*\[       {n_equals=strnequals(); BEGIN(LB_COMMENT);}
   /* Line comment */
-[^\[]      {BEGIN(INLINE_COMMENT);}
-\[/[^=\[]  {BEGIN(INLINE_COMMENT);}
-\[=*/[^\[] {BEGIN(INLINE_COMMENT);}
+[^\[\n]      {BEGIN(INLINE_COMMENT);}
+\[[^=\[\n]   {BEGIN(INLINE_COMMENT);}
+\[=*[^\[\n]  {BEGIN(INLINE_COMMENT);}
+\n           {BEGIN(INITIAL);}
 }
 
-<INLINE_COMMENT>.*\n  {
-    //strcat(strbuf, yytext);
-    //printf("Comment: %s\n", strbuf);
-    BEGIN(INITIAL);
+<INLINE_COMMENT>{
+.*\n    {BEGIN(INITIAL);}
 }
 
 <LB_COMMENT>{

@@ -1,7 +1,7 @@
 %output "parser.c"
 %defines "parser.h"
 %define parse.error verbose
-// %define parse.lac full
+%define parse.lac full
 %debug
 
 %{
@@ -12,6 +12,7 @@ int yylex();
 void yyerror();
 
 extern int yylineno;
+extern int yy_flex_debug;
 %}
 
 %token	IDENTIFIER STRINGCONST INTCONST FLOATCONST
@@ -38,11 +39,6 @@ extern int yylineno;
 %left   "*" "/" "//" "%"
 %left   "not" "#" 
 %right  "^"
-
-
-//%precedence "end"
-//%precedence "else"
-//%precedence "elseif"
 
 %nonassoc "("
 
@@ -79,7 +75,7 @@ if_stmt:          "if" exp "then" block "end"
 |                 "if" exp "then" block elseif_stmt "else" block "end"
 ;
 
-elseif_stmt:      "elseif" exp "then" block  elseif_stmt
+elseif_stmt:      elseif_stmt "elseif" exp "then" block
 |                 "elseif" exp "then" block
 ;
 
@@ -107,7 +103,7 @@ dotseq:           "." IDENTIFIER dotseq
 |                 "." IDENTIFIER
 ;
 
-varlist:          var "," varlist
+varlist:          varlist "," var
 |                 var
 ;
 
@@ -121,7 +117,7 @@ namelist:         IDENTIFIER
 ;
 
 explist:          exp
-|                 exp "," explist
+|                 explist "," exp
 ;
 
 exp:              "nil"
@@ -172,11 +168,6 @@ parlist:          namelist "," "..."
 tableconstructor: "{" fieldlist "}"
 |                 "{" "}"
 ;
-
-// fieldlist:        field fieldsep fieldlist 
-// |                 field fieldsep fieldlist fieldsep 
-// |                 field
-// ;
 
 fieldlist:        field
 |                 field fieldsep
@@ -236,6 +227,7 @@ void yyerror (char const *s) {
 int main(void) {
     #ifdef YYDEBUG
       yydebug = 1;
+      yy_flex_debug = 1;
     #endif
     if (yyparse() == 0) {
         puts("PARSE SUCCESSFUL");
