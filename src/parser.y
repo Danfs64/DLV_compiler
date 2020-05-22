@@ -1,8 +1,12 @@
+// LALR(1) grammar for Lua.
+// Adapted from http://lua-users.org/wiki/LuaFourOneGrammar, which is version
+// 4.1 of the language. Additional constructs were added to make the grammar
+// 5.3 compliant.
+
 %output "parser.c"
 %defines "parser.h"
 %define parse.error verbose
 %define parse.lac full
-%debug
 
 %{
 #include <stdio.h>
@@ -26,6 +30,7 @@ extern int yy_flex_debug;
 %token	LBCK "[" RBCK "]" DCOL "::" SCOL ";" COL ":" COM "," DOT "." CAT ".."
 %token	VARG "..."
 
+%precedence ";"
 
 %left   "or"
 %left   "and"
@@ -37,184 +42,268 @@ extern int yy_flex_debug;
 %right  ".."
 %left   "+" "-"
 %left   "*" "/" "//" "%"
-%left   "not" "#" 
+%left   "not" "#"
 %right  "^"
 
-%nonassoc "("
+// From: http://lua-users.org/wiki/LuaFourOneGrammar
+// Note that left parenthesis, left brace, and literals are preferentially treated
+// as arguments rather than as starting a new expession. This rule comes into
+// effect when interpreting a call as a statement, or a primary, variable, or call
+// as an expession. Without this rule, the grammar is ambiguous.
+
+%precedence "(" "{" STRINGCONST
+
+%start chunk
 
 %%
 
-chunk:            block
+// --- Helpers rules
+
+numeral:
+    INTCONST
+|   FLOATCONST
 ;
 
-block:            stat block
-|                 retstat
-|                 %empty
+// --- Opt
+
+opt_retstat:
+    %empty
+|   retstat
 ;
 
-stat:             ";"
-|                 varlist "=" explist
-|                 functioncall
-|                 label
-|                 "break"
-|                 "goto" IDENTIFIER
-|                 "do" block "end"
-|                 "while" exp "do" block "end"
-|                 "repeat" block "until" exp
-|                 if_stmt
-|                 for_stmt
-|                 "function" funcname funcbody
-|                 "local" "function" IDENTIFIER funcbody
-|                 "local" namelist
-|                 "local" namelist "=" explist
+opt_semi:
+    %empty
+|   ";"
 ;
 
-if_stmt:          "if" exp "then" block "end"
-|                 "if" exp "then" block "else" block "end"
-|                 "if" exp "then" block elseif_stmt "end"
-|                 "if" exp "then" block elseif_stmt "else" block "end"
+opt_else:
+    %empty
+|   "else" block
 ;
 
-elseif_stmt:      elseif_stmt "elseif" exp "then" block
-|                 "elseif" exp "then" block
+opt_comma_exp:
+    %empty
+|   "," exp
 ;
 
-for_stmt:         "for" IDENTIFIER "=" exp "," exp "do" block "end"
-|                 "for" IDENTIFIER "=" exp "," exp "," exp "do" block "end"
-|                 "for" namelist "in" explist "do" block "end"
+opt_parlist:
+    %empty
+|   parlist
 ;
 
-retstat:          "return"
-|                 "return" ";"
-|                 "return" explist
-|                 "return" explist ";"
+opt_eq_explist:
+    %empty
+|   "=" explist
 ;
 
-label:            "::" IDENTIFIER "::"
+opt_explist:
+    %empty
+|   explist
 ;
 
-funcname:         IDENTIFIER
-|                 IDENTIFIER ":" IDENTIFIER
-|                 IDENTIFIER dotseq
-|                 IDENTIFIER dotseq ":" IDENTIFIER
+opt_col_name:
+    %empty
+|   ":" IDENTIFIER
 ;
 
-dotseq:           "." IDENTIFIER dotseq
-|                 "." IDENTIFIER
+opt_comma_elip:
+    %empty
+|   "," "..."
 ;
 
-varlist:          varlist "," var
-|                 var
+opt_fieldlist:
+    %empty
+|   fieldlist
 ;
 
-var:              IDENTIFIER
-|                 prefixexp "[" exp "]"
-|                 prefixexp "." IDENTIFIER
+opt_fieldsep:
+    %empty
+|   fieldsep
 ;
 
-namelist:         IDENTIFIER 
-|                 namelist "," IDENTIFIER
+// --- Loop
+
+loop_stat:
+    %empty
+|   loop_stat stat
 ;
 
-explist:          exp
-|                 explist "," exp
+loop_elseif:
+    %empty
+|   loop_elseif "elseif" exp "then" block
 ;
 
-exp:              "nil"
-|                 "false"
-|                 "true"
-|                 numeral
-|                 STRINGCONST
-|                 "..."
-|                 functiondef
-|                 prefixexp
-|                 tableconstructor
-|                 binop
-|                 unop
+loop_dot_name:
+    %empty
+|   loop_dot_name "." IDENTIFIER
 ;
 
-numeral:          INTCONST
-|                 FLOATCONST
+loop_fields:
+    %empty
+|   loop_fields fieldsep field
 ;
 
-prefixexp:        var
-|                 functioncall
-|                 "(" exp ")"
+// --- Rules
+
+chunk:
+    block
 ;
 
-functioncall:     prefixexp args
-|                 prefixexp ":" IDENTIFIER args
+block:
+    loop_stat opt_retstat
 ;
 
-args:             "(" ")"
-|                 "(" explist ")"
-|                 tableconstructor
-|                 STRINGCONST
+stat:
+    ";"
+|   varlist "=" explist
+|   call                            %prec ";"
+|   label
+|   "break"
+|   "goto" IDENTIFIER
+|   "do" block "end"
+|   "while" exp "do" block "end"
+|   "repeat" block "until" exp
+|   "if" exp "then" block loop_elseif opt_else "end"
+|   "for" IDENTIFIER "=" exp "," exp opt_comma_exp "do" block "end"
+|   "for" namelist "in" explist "do" block "end"
+|   "function" funcname funcbody
+|   "local" "function" IDENTIFIER funcbody
+|   "local" namelist opt_eq_explist
 ;
 
+retstat:
+    "return" opt_explist opt_semi
 
-functiondef:      "function" funcbody
+label:
+    "::" IDENTIFIER "::"
 ;
 
-funcbody:         "(" ")" block "end"
-|                 "(" parlist ")" block "end"
+funcname:
+    IDENTIFIER loop_dot_name opt_col_name
 ;
 
-parlist:          namelist "," "..."  
-|                 namelist
-|                 "..."
+varlist:
+    var
+|   varlist "," var
+
+var:
+    IDENTIFIER
+|   primary index
+|   var index
+|   call index
 ;
 
-tableconstructor: "{" fieldlist "}"
-|                 "{" "}"
+index:
+    "[" exp "]"
+|   "." IDENTIFIER
 ;
 
-fieldlist:        field
-|                 field fieldsep
-|                 fieldlist1 field
-|                 fieldlist1 field fieldsep
+namelist:
+    IDENTIFIER
+|   namelist "," IDENTIFIER
 ;
 
-fieldlist1:       fieldlist1 field fieldsep
-|                 field fieldsep
+explist:
+    exp
+|   explist "," exp
 ;
 
-field:            "[" exp "]" "=" exp
-|                 IDENTIFIER "=" exp
-|                 exp
+exp:
+    primary     %prec ";"
+|   var         %prec ";"
+|   call        %prec ";"
+|   binop
+|   unop
 ;
 
-fieldsep:         ","
-|                 ";"
+primary:
+    "nil"
+|   "false"
+|   "true"
+|   numeral
+|   STRINGCONST
+|   "..."
+|   functiondef
+|   tableconstructor
+|   "(" exp ")"
 ;
 
-binop:            exp "+" exp
-|                 exp "-" exp
-|                 exp "*" exp
-|                 exp "/" exp
-|                 exp "//" exp
-|                 exp "^" exp
-|                 exp "%" exp
-|                 exp "&" exp
-|                 exp "~" exp
-|                 exp "|" exp
-|                 exp ">>" exp
-|                 exp "<<" exp
-|                 exp ".." exp
-|                 exp "<" exp
-|                 exp "<=" exp
-|                 exp ">" exp
-|                 exp ">=" exp
-|                 exp "==" exp
-|                 exp "~=" exp
-|                 exp "and" exp
-|                 exp "or" exp
+call:
+    primary args
+|   primary ":" IDENTIFIER args
+|   var args
+|   var ":" IDENTIFIER args
+|   call args
+|   call ":" IDENTIFIER args
 ;
 
-unop:             "-" exp   %prec "not"
-|                 "not" exp
-|                 "#" exp
-|                 "~" exp  %prec "not"
+args:
+    "(" opt_explist ")"
+|   tableconstructor
+|   STRINGCONST
+;
+
+functiondef:
+    "function" funcbody
+;
+
+funcbody:
+    "(" opt_parlist ")" block "end"
+;
+
+parlist:
+   namelist opt_comma_elip
+|  "..."
+;
+
+tableconstructor:
+    "{" opt_fieldlist "}"
+;
+
+fieldlist:
+    field loop_fields opt_fieldsep
+;
+
+field:
+    "[" exp "]" "=" exp
+|   IDENTIFIER "=" exp
+|   exp
+;
+
+fieldsep:
+    ","
+|   ";"
+;
+
+binop:
+    exp "+" exp
+|   exp "-" exp
+|   exp "*" exp
+|   exp "/" exp
+|   exp "//" exp
+|   exp "^" exp
+|   exp "%" exp
+|   exp "&" exp
+|   exp "~" exp
+|   exp "|" exp
+|   exp ">>" exp
+|   exp "<<" exp
+|   exp ".." exp
+|   exp "<" exp
+|   exp "<=" exp
+|   exp ">" exp
+|   exp ">=" exp
+|   exp "==" exp
+|   exp "~=" exp
+|   exp "and" exp
+|   exp "or" exp
+;
+
+unop:
+    "-" exp     %prec "not"
+|   "not" exp
+|   "#" exp
+|   "~" exp     %prec "not"
 ;
 
 %%
@@ -225,10 +314,6 @@ void yyerror (char const *s) {
 }
 
 int main(void) {
-    #ifdef YYDEBUG
-      yydebug = 1;
-      yy_flex_debug = 1;
-    #endif
     if (yyparse() == 0) {
         puts("PARSE SUCCESSFUL");
     } else {
