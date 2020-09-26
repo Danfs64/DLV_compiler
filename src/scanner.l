@@ -58,7 +58,11 @@ float        {floatd}|{floatx}
 
 id           [[:alpha:]_][[:alnum:]_]*
 goto_label   ::{id}::
-string       \"[^\"\n]*\"|'[^'\n]*'
+
+string_dq    \"(\\.|[^\\"\n]|\\\n|\\z[ \n]*)*\"
+   /* '[^'\n]*' */
+string_sq    '(\\.|[^\\'\n]|\\\n|\\z[ \n]*)*'   
+string       {string_dq}|{string_sq}
 
 ignore       [[:space:]]+
 
@@ -159,7 +163,7 @@ while    return WHILE;
 {int}    return INTCONST;   //printf("int: %s\n", yytext);
 
   /* Inline strings */
-{string}  return STRINGCONST; //printf("string: %s\n", yytext); 
+{string}  return STRINGCONST; //printf("string: %s\n", yytext);
 
 \[=*\[ {
     n_equals=strnequals();
