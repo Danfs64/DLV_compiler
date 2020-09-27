@@ -1,13 +1,11 @@
-all: parser.c scanner.c parser.h
-	gcc parser.c scanner.c -ly 
+all: parser.cc scanner.cc
+	g++ -std=c++17 parser.cc scanner.cc -ly 
 
-scanner.c: scanner.l
+scanner.cc: scanner.l
 	flex scanner.l
 
-parser.c: parser.y
-	bison parser.y --defines=parser.h --report=all
-parser.h: parser.c
+parser.cc: parser.y
 	bison parser.y --defines=parser.h --report=all
 
 clean:
-	rm parser.c scanner.c parser.h
+	rm parser.cc scanner.cc parser.hpp

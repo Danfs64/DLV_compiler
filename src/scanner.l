@@ -1,32 +1,10 @@
-%option outfile="scanner.c"
+%option outfile="scanner.cc"
 %option yylineno
 %option noyywrap
 
 %{
-#include <string.h>
-#include "parser.h"
-
-int n_equals = 0;
-char strbuf[8192] = {0};
-char inline_string_delimiter;
-
-int strnequals() {
-    int n = 0;
-    char *ptr = yytext;
-    while(*ptr) {
-        n += *ptr == '=';
-        ptr++;
-    }
-    return n;
-}
-
- /*
-void process_token(const char* tok) {
-    printf("%d: %s -> %s\n", yylineno, yytext, yytok);
-}
- */
-
-    /* manifest constants */
+#include <string_view>
+#include "parser.hpp"
 %}
 
     /* From Lua 5.3 manual:
@@ -70,19 +48,24 @@ ignore       [[:space:]]+
 %x LB_COMMENT
 %x INLINE_COMMENT
 %x LB_STRING
+%x SHEBANG
 
 %%
 
+<SHEBANG>{
+#.*\n   {BEGIN(INITIAL);}
+.       {char c = *yytext; unput(c); BEGIN(INITIAL);}
+}
+
 {ignore}  {}
 --      {BEGIN(COMMENT);}
+--\n    {}
 
 <COMMENT>{
-\[=*\[       {n_equals=strnequals(); BEGIN(LB_COMMENT);}
-  /* Line comment */
-[^\[\n]      {BEGIN(INLINE_COMMENT);}
-\[[^=\[\n]   {BEGIN(INLINE_COMMENT);}
-\[=*[^\[\n]  {BEGIN(INLINE_COMMENT);}
-\n           {BEGIN(INITIAL);}
+\[=*\[       {yymore(); BEGIN(LB_COMMENT);}
+    /* Line comment */
+\n           {BEGIN(INLINE_COMMENT);}
+.            {yymore(); BEGIN(INLINE_COMMENT);}
 }
 
 <INLINE_COMMENT>{
@@ -91,15 +74,25 @@ ignore       [[:space:]]+
 
 <LB_COMMENT>{
 \]=*\]  {
-        //strcat(strbuf, yytext);
-        if (strnequals() == n_equals) {
-            //printf("Comment: %s\n", strbuf);
+        const std::string_view str {yytext};
+        int sz1 = 0, sz2 = 0;
+        for (int i = 1; str[i] != '['; ++i) {
+            ++sz1;
+        }
+        for (int i = str.size() - 2; str[i] != ']'; --i) {
+            ++sz2;
+        }
+        if (sz1 == sz2) {
             BEGIN(INITIAL);
+        } else {
+            unput(']');
+            yymore();
         }
     }
-[^\]\n]*  {}
-"]"       {}
-\n        {}
+        /* [^\]\n]*  {yymore();} */
+        /* "]"       {yymore();} */
+        /* \n        {yymore();} */
+.|\n    {yymore();}
 } 
 
 and      return AND;
@@ -166,21 +159,28 @@ while    return WHILE;
 {string}  return STRINGCONST; //printf("string: %s\n", yytext);
 
 \[=*\[ {
-    n_equals=strnequals();
-    strcpy(strbuf, yytext);
+    yymore();
     BEGIN(LB_STRING);
 }
 <LB_STRING>{
 \]=*\]    {
-        strcat(strbuf, yytext);
-        if (strnequals() == n_equals) {
+        const std::string_view str {yytext};
+        int sz1 = 0, sz2 = 0;
+        for (int i = 1; str[i] != '['; ++i) {
+            ++sz1;
+        }
+        for (int i = str.size() - 2; str[i] != ']'; --i) {
+            ++sz2;
+        }
+        if (sz1 == sz2) {
             BEGIN(INITIAL);
             return STRINGCONST; //printf("string: %s\n", strbuf);
+        } else {
+            unput(']');
+            yymore();
         }
     }
-[^\]\n]*  {strcat(strbuf, yytext);}
-"]"       {strcat(strbuf, yytext);}
-\n        {strcat(strbuf, yytext);}
+.|\n      {yymore();}
 } 
 
 {id}  return IDENTIFIER; //printf("id: %s\n", yytext);
@@ -188,4 +188,11 @@ while    return WHILE;
 .   {
     printf("LEXICAL ERROR (%d): Unknown symbol %s\n", yylineno, yytext);
     exit(EXIT_FAILURE);
+}
+
+
+%%
+
+void init_shebang() {
+    BEGIN(SHEBANG);
 }

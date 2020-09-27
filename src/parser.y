@@ -3,17 +3,19 @@
 // 4.1 of the language. Additional constructs were added to make the grammar
 // 5.3 compliant.
 
-%output "parser.c"
-%defines "parser.h"
+%output "parser.cc"
+%defines "parser.hpp"
 %define parse.error verbose
 %define parse.lac full
+%define parse.trace
 
 %{
 #include <stdio.h>
 #include <stdlib.h>
 
 int yylex();
-void yyerror();
+void yyerror(const char*);
+void init_shebang();
 
 extern int yylineno;
 extern int yy_flex_debug;
@@ -314,6 +316,10 @@ void yyerror (char const *s) {
 }
 
 int main(void) {
+    init_shebang();
+    #ifdef YYDEBUG
+      yydebug = 0;
+    #endif
     if (yyparse() == 0) {
         puts("PARSE SUCCESSFUL");
     } else {
