@@ -8,4 +8,4 @@ parser.cc: parser.y
 	bison parser.y --defines=parser.h --report=all
 
 clean:
-	rm parser.cc scanner.cc parser.hpp
+	rm parser.cc scanner.cc parser.hpp parser.output
