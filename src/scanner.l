@@ -4,6 +4,7 @@
 
 %{
 #include <string_view>
+#include <stdio.h>
 #include "parser.hpp"
 %}
 
@@ -54,7 +55,7 @@ ignore       [[:space:]]+
 
 <SHEBANG>{
 #.*\n   {BEGIN(INITIAL);}
-.       {char c = *yytext; unput(c); BEGIN(INITIAL);}
+.|\n       {char c = *yytext; unput(c); BEGIN(INITIAL);}
 }
 
 {ignore}  {}
@@ -94,6 +95,10 @@ ignore       [[:space:]]+
         /* \n        {yymore();} */
 .|\n    {yymore();}
 } 
+<LB_COMMENT><<EOF>> {
+    printf("LEXICAL ERROR (%d): unexpected end of file\n", yylineno);
+    exit(EXIT_FAILURE);
+}
 
 and      return AND;
 break    return BREAK;
