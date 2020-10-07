@@ -1,6 +1,7 @@
 #!/bin/sh
 
 [ ! -e './dlvc' ] && { printf "dlvc binary doesn't exist!\n"; exit 1; }
+IFS=$'\n'
 
 printf "RUNNING CORRECT TESTS\n"
 for i in $(ls ./tests/correct/*.lua)

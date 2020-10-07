@@ -1,0 +1,1 @@
+ans = aBoolValue and 'yes' nor 'no'
