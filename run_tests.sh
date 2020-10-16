@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/env bash
 
 [ ! -e './dlvc' ] && { printf "dlvc binary doesn't exist!\n"; exit 1; }
 IFS=$'\n'
