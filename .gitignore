@@ -1,5 +1,5 @@
-./dlcv
-./src/parser.hpp
-./src/parser.cc
-./src/parser.output
-./src/scanner.cc
+dlcv
+src/parser.hpp
+src/parser.cc
+src/parser.output
+src/scanner.cc
