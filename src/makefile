@@ -1,5 +1,5 @@
-all: parser.cc scanner.cc
-	g++ -std=c++17 parser.cc scanner.cc -ly 
+all: parser.cc scanner.cc error_messages.cpp lua_things.cpp
+	g++ -std=c++17 $? -ly 
 
 scanner.cc: scanner.l
 	flex scanner.l

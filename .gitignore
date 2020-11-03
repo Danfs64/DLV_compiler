@@ -1,0 +1,6 @@
+.ccls-cache
+.vscode
+src/scanner.cc
+src/parser.cc
+src/parser.output
+src/parser.hpp
