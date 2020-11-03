@@ -9,9 +9,15 @@
 %define parse.lac full
 %define parse.trace
 
-%{
+%code top {
+#include <vector>
 #include <stdio.h>
 #include <stdlib.h>
+#include "lua_things.hpp"
+#include "data_structures.hpp"
+#include "error_messages.hpp"
+
+#define YYSTYPE lua_things::Type
 
 int yylex();
 void yyerror(const char*);
@@ -19,7 +25,27 @@ void init_shebang();
 
 extern int yylineno;
 extern int yy_flex_debug;
-%}
+}
+
+%code {
+    /* Utility macros and functions */
+    #define TRY_OP(bop, vf, v1, v2, func)  try { vf = func(v1, v2);} catch (std::exception& e) { error_binop( bop , v1, v2); }
+
+    #define TRY_ARITHM(bop, vf, v1, v2)  TRY_OP(bop, vf, v1, v2, lua_things::check_arithm)
+    #define TRY_EQ(bop, vf, v1, v2)      TRY_OP(bop, vf, v1, v2, lua_things::check_eq)
+    #define TRY_NEQ(bop, vf, v1, v2)     TRY_OP(bop, vf, v1, v2, lua_things::check_neq)
+    #define TRY_ORDER(bop, vf, v1, v2)   TRY_OP(bop, vf, v1, v2, lua_things::check_order)
+    #define TRY_CAT(bop, vf, v1, v2)     TRY_OP(bop, vf, v1, v2, lua_things::check_cat)
+    #define TRY_LOGICAL(bop, vf, v1, v2) TRY_OP(bop, vf, v1, v2, lua_things::check_logical)
+    #define TRY_BITWISE(bop, vf, v1, v2) TRY_OP(bop, vf, v1, v2, lua_things::check_bitwise)
+
+    #define TRY_UOP(uop, vf, v, func) try { vf = func(v);} catch (std::exception& e) { error_unop( uop , v); }
+
+    #define TRY_UARITHM(uop, vf, v) TRY_UOP(uop, vf, v, lua_things::check_arithm)
+    #define TRY_UBITWISE(uop, vf, v) TRY_UOP(uop, vf, v, lua_things::check_bitwise)
+    #define TRY_NOT(uop, vf, v) TRY_UOP(uop, vf, v, lua_things::check_not)
+    #define TRY_LEN(uop, vf, v) TRY_UOP(uop, vf, v, lua_things::check_len)
+}
 
 %token	IDENTIFIER STRINGCONST INTCONST FLOATCONST
 %token	AND "and" BREAK "break" DO "do" ELSE "else" ELSEIF "elseif" END "end"
@@ -219,15 +245,15 @@ exp:
 ;
 
 primary:
-    "nil"
-|   "false"
-|   "true"
-|   numeral
-|   STRINGCONST
-|   "..."
-|   functiondef
-|   tableconstructor
-|   "(" exp ")"
+    "nil"            { $$ = lua_things::Type::NIL; }
+|   "false"          { $$ = lua_things::Type::BOOL; }
+|   "true"           { $$ = lua_things::Type::BOOL; }
+|   numeral          { $$ = lua_things::Type::NUM; }
+|   STRINGCONST      { $$ = lua_things::Type::STR; }
+|   "..."            { $$ = lua_things::Type::TABLE; }
+|   functiondef      { $$ = lua_things::Type::FUNCTION; }
+|   tableconstructor { $$ = lua_things::Type::TABLE; }
+|   "(" exp ")"      { $$ = $2; }
 ;
 
 call:
@@ -278,34 +304,34 @@ fieldsep:
 ;
 
 binop:
-    exp "+" exp
-|   exp "-" exp
-|   exp "*" exp
-|   exp "/" exp
-|   exp "//" exp
-|   exp "^" exp
-|   exp "%" exp
-|   exp "&" exp
-|   exp "~" exp
-|   exp "|" exp
-|   exp ">>" exp
-|   exp "<<" exp
-|   exp ".." exp
-|   exp "<" exp
-|   exp "<=" exp
-|   exp ">" exp
-|   exp ">=" exp
-|   exp "==" exp
-|   exp "~=" exp
-|   exp "and" exp
-|   exp "or" exp
+    exp "+" exp   { TRY_ARITHM("+", $$, $1, $3);   }
+|   exp "-" exp   { TRY_ARITHM("-", $$, $1, $3);   }
+|   exp "*" exp   { TRY_ARITHM("*", $$, $1, $3);   }
+|   exp "/" exp   { TRY_ARITHM("/", $$, $1, $3);   }
+|   exp "//" exp  { TRY_ARITHM("/", $$, $1, $3);   }
+|   exp "^" exp   { TRY_ARITHM("^", $$, $1, $3);   }
+|   exp "%" exp   { TRY_ARITHM("%", $$, $1, $3);   }
+|   exp "&" exp   { TRY_BITWISE("&", $$, $1, $3);  }
+|   exp "~" exp   { TRY_BITWISE("~", $$, $1, $3);  }
+|   exp "|" exp   { TRY_BITWISE("|", $$, $1, $3);  }
+|   exp ">>" exp  { TRY_BITWISE(">>", $$, $1, $3); }
+|   exp "<<" exp  { TRY_BITWISE("<<", $$, $1, $3); }
+|   exp ".." exp  { TRY_CAT("..", $$, $1, $3);     }
+|   exp "<" exp   { TRY_ORDER("<", $$, $1, $3);    }
+|   exp "<=" exp  { TRY_ORDER("<=", $$, $1, $3);   }
+|   exp ">" exp   { TRY_ORDER(">", $$, $1, $3);    }
+|   exp ">=" exp  { TRY_ORDER(">=", $$, $1, $3);   }
+|   exp "==" exp  { TRY_EQ("==", $$, $1, $3);      }
+|   exp "~=" exp  { TRY_NEQ("~=", $$, $1, $3);     }
+|   exp "and" exp { TRY_LOGICAL("and", $$, $1, $3);}
+|   exp "or" exp  { TRY_LOGICAL("or", $$, $1, $3); }
 ;
 
 unop:
-    "-" exp     %prec "not"
-|   "not" exp
-|   "#" exp
-|   "~" exp     %prec "not"
+    "-"   exp     %prec "not" { TRY_UARITHM("-", $$, $1);  }
+|   "not" exp                 { TRY_NOT("not", $$, $1);    }
+|   "#"   exp                 { TRY_LEN("#", $$, $1);      }
+|   "~"   exp     %prec "not" { TRY_UBITWISE("~", $$, $1); }
 ;
 
 %%
