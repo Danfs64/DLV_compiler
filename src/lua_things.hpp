@@ -5,14 +5,18 @@
 
 namespace lua_things {
     namespace {
-        const char* type_error_message = "Incompatible types.";
-        /*
-        DEFINIR REGEX AQUI
-        */
+        const char* type_strings[] = {
+            "NIL",
+            "BOOL",
+            "NUM",
+            "STR",
+            "FUNCTION",
+            "TABLE"
+        };
     };
     using type_error = std::runtime_error;
 
-    enum class Type {
+    enum class Type : int {
         NIL,
         BOOL,
         NUM,
@@ -21,29 +25,22 @@ namespace lua_things {
         TABLE,
     };
 
-    #define o(op)                                                \
-    Type operator##op##(Type t1, Type t2) {                      \
-        if (t1 == Type::NUM && t2 == Type::NUM) {                \
-            return Type::NUM;                                    \
-        } else if (t1 == Type::TABLE || t2 == Type::TABLE) {     \
-            return Type::TABLE;                                  \
-        } else if (t1 == Type::STR && t2 == Type::NUM ||         \
-                   t1 == Type::NUM && t2 == Type::STR) {         \
-            /* Suponhamos que a string é um float no             \
-               formato correto                                   \
-            */                                                   \
-            return Type::NUM;                                    \
-        } else {                                                 \
-            throw type_error(type_error_message);                \
-        }                                                        \
-    };
-    o(+)
-    o(-)
-    o(/)
-    o(*)
-    o(%)    
-    o(^)
-    #undef o
+    inline const char* type_string(Type t) {
+        int idx = static_cast<int>(t);
+        return type_strings[idx];
+    }
+
+    Type check_arithm(Type t1, Type t2);
+    Type check_eq(Type t1, Type t2);
+    Type check_neq(Type t1, Type t2);
+    Type check_order(Type t1, Type t2);
+    Type check_logical(Type t1, Type t2);
+    Type check_bitwise(Type t1, Type t2);
+    Type check_cat(Type t1, Type t2);
+    Type check_bitwise(Type t);
+    Type check_arithm(Type t);
+    Type check_not(Type t);
+    Type check_len(Type t);
 }
 
 #endif
