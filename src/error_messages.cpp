@@ -49,3 +49,11 @@ void error_break() {
     std::cerr << error_string;
     exit(6);
 }
+
+void error_identifier_dont_exist() {
+    const char* message_template = "(%d) id dont exist.\n";
+    char error_string[100];
+    sprintf(error_string, message_template, yylineno);
+    std::cerr << error_string;
+    exit(7);
+}
