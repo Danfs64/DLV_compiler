@@ -13,6 +13,7 @@
 #include <vector>
 #include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
 #include "lua_things.hpp"
 #include "data_structures.hpp"
 #include "error_messages.hpp"
@@ -23,13 +24,38 @@ int yylex();
 void yyerror(const char*);
 void init_shebang();
 
+extern char* yytext;
 extern int yylineno;
 extern int yy_flex_debug;
+
+data_structures::context ctx;
+
+enum class var_type : int {
+    NAME,
+    INDEX,
+};
+
+enum class list_type : int {
+    VARLIST,
+    EXPLIST,
+    NO_TYPE,
+};
+
+namespace tmp {
+    std::vector<std::string> namelist;
+    std::vector<lua_things::Type> explist;
+    data_structures::assign_type assign_type;
+    std::vector<std::tuple<std::string, var_type>> varlist;
+    std::string last_identifier;
+    std::vector<std::string> full_funcname;
+    list_type assign_list_type = list_type::VARLIST;
+}
+
 }
 
 %code {
     /* Utility macros and functions */
-    #define TRY_OP(bop, vf, v1, v2, func)  try { vf = func(v1, v2);} catch (std::exception& e) { error_binop( bop , v1, v2); }
+    #define TRY_OP(bop, vf, v1, v2, func)  { try { vf = func(v1, v2); } catch (std::exception& e) { std::cout << e.what();  error_binop( bop , v1, v2); } }
 
     #define TRY_ARITHM(bop, vf, v1, v2)  TRY_OP(bop, vf, v1, v2, lua_things::check_arithm)
     #define TRY_EQ(bop, vf, v1, v2)      TRY_OP(bop, vf, v1, v2, lua_things::check_eq)
@@ -39,12 +65,27 @@ extern int yy_flex_debug;
     #define TRY_LOGICAL(bop, vf, v1, v2) TRY_OP(bop, vf, v1, v2, lua_things::check_logical)
     #define TRY_BITWISE(bop, vf, v1, v2) TRY_OP(bop, vf, v1, v2, lua_things::check_bitwise)
 
-    #define TRY_UOP(uop, vf, v, func) try { vf = func(v);} catch (std::exception& e) { error_unop( uop , v); }
+    #define TRY_UOP(uop, vf, v, func) { try { vf = func(v); } catch (std::exception& e) { error_unop( uop , v); } }
 
-    #define TRY_UARITHM(uop, vf, v) TRY_UOP(uop, vf, v, lua_things::check_arithm)
-    #define TRY_UBITWISE(uop, vf, v) TRY_UOP(uop, vf, v, lua_things::check_bitwise)
-    #define TRY_NOT(uop, vf, v) TRY_UOP(uop, vf, v, lua_things::check_not)
-    #define TRY_LEN(uop, vf, v) TRY_UOP(uop, vf, v, lua_things::check_len)
+    #define TRY_UARITHM(uop, vf, v)   TRY_UOP(uop, vf, v, lua_things::check_arithm)
+    #define TRY_UBITWISE(uop, vf, v)  TRY_UOP(uop, vf, v, lua_things::check_bitwise)
+    #define TRY_NOT(uop, vf, v)       TRY_UOP(uop, vf, v, lua_things::check_not)
+    #define TRY_LEN(uop, vf, v)       TRY_UOP(uop, vf, v, lua_things::check_len)
+
+    #define TRY_CALL(vf, v)  { try { vf = lua_things::check_call(v); } catch (std::exception& e) { error_call(v); } }
+
+    #define TRY_INDEX(vf, v1, v2)  { try { vf = lua_things::check_index(v1, v2); } catch (std::exception& e) { error_index(v1, v2); } }
+
+    #define ASSIGN_LOCAL() tmp::assign_type = data_structures::assign_type::LOCAL
+    #define ASSIGN_GLOBAL() tmp::assign_type = data_structures::assign_type::GLOBAL
+    #define ASSIGN_AND_CLEAR() { add_assign_list(); tmp::namelist.clear(); tmp::explist.clear(); }
+
+    #define UPDATE_IDENTIFIER() { tmp::last_identifier = yytext; }
+
+    #define NEW_SCOPE(TYPE)    { ctx.new_scope(data_structures::scope_type::TYPE); }
+    #define REMOVE_SCOPE()     { ctx.remove_scope(); }
+
+    #include "parser_utils.cpp"
 }
 
 %token	IDENTIFIER STRINGCONST INTCONST FLOATCONST
@@ -106,7 +147,7 @@ opt_semi:
 
 opt_else:
     %empty
-|   "else" block
+|   "else" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); }
 ;
 
 opt_comma_exp:
@@ -131,7 +172,7 @@ opt_explist:
 
 opt_col_name:
     %empty
-|   ":" IDENTIFIER
+|   ":" IDENTIFIER  { UPDATE_IDENTIFIER(); tmp::full_funcname.emplace_back(tmp::last_identifier); }
 ;
 
 opt_comma_elip:
@@ -158,12 +199,12 @@ loop_stat:
 
 loop_elseif:
     %empty
-|   loop_elseif "elseif" exp "then" block
+|   loop_elseif "elseif" exp "then" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); }
 ;
 
 loop_dot_name:
     %empty
-|   loop_dot_name "." IDENTIFIER
+|   loop_dot_name "." IDENTIFIER { UPDATE_IDENTIFIER(); tmp::full_funcname.emplace_back(tmp::last_identifier); }
 ;
 
 loop_fields:
@@ -183,31 +224,57 @@ block:
 
 stat:
     ";"
-|   varlist "=" explist
+|   varlist "=" {
+        tmp::assign_list_type = list_type::EXPLIST;
+    } explist {
+        ASSIGN_AND_CLEAR();
+        tmp::assign_list_type = list_type::VARLIST;
+    }
 |   call                            %prec ";"
 |   label
-|   "break"
+|   "break" { if(!ctx.verify_break()) { error_break(); } }
 |   "goto" IDENTIFIER
-|   "do" block "end"
-|   "while" exp "do" block "end"
-|   "repeat" block "until" exp
-|   "if" exp "then" block loop_elseif opt_else "end"
-|   "for" IDENTIFIER "=" exp "," exp opt_comma_exp "do" block "end"
-|   "for" namelist "in" explist "do" block "end"
-|   "function" funcname funcbody
-|   "local" "function" IDENTIFIER funcbody
-|   "local" namelist opt_eq_explist
+|   "do" { NEW_SCOPE(NON_LOOP); } block "end" { REMOVE_SCOPE(); }
+|   "while" exp "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
+|   "repeat" { NEW_SCOPE(LOOP); } block "until" exp { REMOVE_SCOPE(); }
+|   "if" exp "then" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); } loop_elseif opt_else "end"
+|   "for" IDENTIFIER "=" exp "," exp opt_comma_exp "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
+|   "for" namelist "in" explist "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
+|   "function" funcname {
+        UPDATE_IDENTIFIER();
+        add_symbol_global_scope(tmp::full_funcname.at(0), yylineno, $2);
+        tmp::full_funcname.clear();
+        ctx.new_scope(data_structures::scope_type::FUNCTION);
+    } funcbody {
+        ctx.remove_scope();
+    }
+|   "local" "function" IDENTIFIER {
+        UPDATE_IDENTIFIER();
+        add_symbol_last_scope(tmp::last_identifier, yylineno, lua_things::Type::FUNCTION);
+        ctx.new_scope(data_structures::scope_type::FUNCTION);
+    } funcbody {
+        ctx.remove_scope();
+    }
+|   "local" {
+        ASSIGN_LOCAL();
+    }  namelist {
+        tmp::assign_list_type = list_type::EXPLIST;
+    } opt_eq_explist {
+        ASSIGN_AND_CLEAR();
+        ASSIGN_GLOBAL();
+        tmp::assign_list_type = list_type::VARLIST;
+    }
 ;
 
 retstat:
     "return" opt_explist opt_semi
 
 label:
-    "::" IDENTIFIER "::"
+    "::" IDENTIFIER { add_label(yytext); } "::"
 ;
 
 funcname:
-    IDENTIFIER loop_dot_name opt_col_name
+    IDENTIFIER { UPDATE_IDENTIFIER(); tmp::full_funcname.emplace_back(tmp::last_identifier); } loop_dot_name opt_col_name  { $$ = add_func(); }
 ;
 
 varlist:
@@ -215,30 +282,52 @@ varlist:
 |   varlist "," var
 
 var:
-    IDENTIFIER
-|   primary index
-|   var index
-|   call index
+    IDENTIFIER {
+        UPDATE_IDENTIFIER();
+        #ifdef DLVCDEBUG
+        std::cerr << "-------- Acessing identifier --------" << std::endl;
+        switch (tmp::assign_list_type) {
+            case list_type::VARLIST:
+                std::cerr << "LIST_TYPE: VARLIST" << std::endl;
+                break;
+            case list_type::EXPLIST:
+                std::cerr << "LIST_TYPE: EXPLIST" << std::endl;
+                break;
+            default:
+                std::cerr << "LIST_TYPE: NO_TYPE" << std::endl;
+                break;
+        }
+        #endif
+        if (tmp::assign_list_type == list_type::EXPLIST) {
+            $$ = identifier_check(tmp::last_identifier);
+            tmp::varlist.emplace_back(yytext, var_type::NAME);
+        } else {
+            tmp::namelist.emplace_back(tmp::last_identifier);
+        }
+    }
+|   primary index  { TRY_INDEX($$, $1, $2); }
+|   var index      { TRY_INDEX($$, $1, $2); }
+|   call index     { TRY_INDEX($$, lua_things::Type::TABLE, $2); }
 ;
 
 index:
-    "[" exp "]"
-|   "." IDENTIFIER
+    "[" exp "]"       { $$ = $2; }
+|   "." IDENTIFIER    { $$ = $2; }
 ;
 
 namelist:
-    IDENTIFIER
-|   namelist "," IDENTIFIER
+    IDENTIFIER                 { tmp::namelist.emplace_back(yytext); }
+|   namelist "," IDENTIFIER    { tmp::namelist.emplace_back(yytext); }
 ;
 
 explist:
-    exp
-|   explist "," exp
+    exp                   { tmp::explist.emplace_back($1); }
+|   explist "," exp       { tmp::explist.emplace_back($3); }
 ;
 
 exp:
-    primary     %prec ";"
-|   var         %prec ";"
+    primary     %prec ";"  { $$ = $1; }
+|   var         %prec ";"  { $$ = $1; }
 |   call        %prec ";"
 |   binop
 |   unop
@@ -257,12 +346,12 @@ primary:
 ;
 
 call:
-    primary args
-|   primary ":" IDENTIFIER args
-|   var args
-|   var ":" IDENTIFIER args
-|   call args
-|   call ":" IDENTIFIER args
+    primary args                   { TRY_CALL($$, $1); }
+|   primary ":" IDENTIFIER args    { TRY_CALL($$, $1); }
+|   var args                       { TRY_CALL($$, $1); }
+|   var ":" IDENTIFIER args        { TRY_CALL($$, $1); }
+|   call args                      { TRY_CALL($$, $1); }
+|   call ":" IDENTIFIER args       { TRY_CALL($$, $1); }
 ;
 
 args:
@@ -272,7 +361,7 @@ args:
 ;
 
 functiondef:
-    "function" funcbody
+    "function"  funcbody
 ;
 
 funcbody:
@@ -293,7 +382,7 @@ fieldlist:
 ;
 
 field:
-    "[" exp "]" "=" exp
+    "[" exp "]" "=" exp            /* VERIFICAR se exp do índice é nil */
 |   IDENTIFIER "=" exp
 |   exp
 ;
@@ -304,27 +393,27 @@ fieldsep:
 ;
 
 binop:
-    exp "+" exp   { TRY_ARITHM("+", $$, $1, $3);   }
-|   exp "-" exp   { TRY_ARITHM("-", $$, $1, $3);   }
-|   exp "*" exp   { TRY_ARITHM("*", $$, $1, $3);   }
-|   exp "/" exp   { TRY_ARITHM("/", $$, $1, $3);   }
-|   exp "//" exp  { TRY_ARITHM("/", $$, $1, $3);   }
-|   exp "^" exp   { TRY_ARITHM("^", $$, $1, $3);   }
-|   exp "%" exp   { TRY_ARITHM("%", $$, $1, $3);   }
-|   exp "&" exp   { TRY_BITWISE("&", $$, $1, $3);  }
-|   exp "~" exp   { TRY_BITWISE("~", $$, $1, $3);  }
-|   exp "|" exp   { TRY_BITWISE("|", $$, $1, $3);  }
-|   exp ">>" exp  { TRY_BITWISE(">>", $$, $1, $3); }
-|   exp "<<" exp  { TRY_BITWISE("<<", $$, $1, $3); }
-|   exp ".." exp  { TRY_CAT("..", $$, $1, $3);     }
-|   exp "<" exp   { TRY_ORDER("<", $$, $1, $3);    }
-|   exp "<=" exp  { TRY_ORDER("<=", $$, $1, $3);   }
-|   exp ">" exp   { TRY_ORDER(">", $$, $1, $3);    }
-|   exp ">=" exp  { TRY_ORDER(">=", $$, $1, $3);   }
-|   exp "==" exp  { TRY_EQ("==", $$, $1, $3);      }
-|   exp "~=" exp  { TRY_NEQ("~=", $$, $1, $3);     }
-|   exp "and" exp { TRY_LOGICAL("and", $$, $1, $3);}
-|   exp "or" exp  { TRY_LOGICAL("or", $$, $1, $3); }
+    exp "+"   exp { TRY_ARITHM("+", $$, $1, $3);    }
+|   exp "-"   exp { TRY_ARITHM("-", $$, $1, $3);    }
+|   exp "*"   exp { TRY_ARITHM("*", $$, $1, $3);    }
+|   exp "/"   exp { TRY_ARITHM("/", $$, $1, $3);    }
+|   exp "//"  exp { TRY_ARITHM("/", $$, $1, $3);    }
+|   exp "^"   exp { TRY_ARITHM("^", $$, $1, $3);    }
+|   exp "%"   exp { TRY_ARITHM("%", $$, $1, $3);    }
+|   exp "&"   exp { TRY_BITWISE("&", $$, $1, $3);   }
+|   exp "~"   exp { TRY_BITWISE("~", $$, $1, $3);   }
+|   exp "|"   exp { TRY_BITWISE("|", $$, $1, $3);   }
+|   exp ">>"  exp { TRY_BITWISE(">>", $$, $1, $3);  }
+|   exp "<<"  exp { TRY_BITWISE("<<", $$, $1, $3);  }
+|   exp ".."  exp { TRY_CAT("..", $$, $1, $3);      }
+|   exp "<"   exp { TRY_ORDER("<", $$, $1, $3);     }
+|   exp "<="  exp { TRY_ORDER("<=", $$, $1, $3);    }
+|   exp ">"   exp { TRY_ORDER(">", $$, $1, $3);     }
+|   exp ">="  exp { TRY_ORDER(">=", $$, $1, $3);    }
+|   exp "=="  exp { TRY_EQ("==", $$, $1, $3);       }
+|   exp "~="  exp { TRY_NEQ("~=", $$, $1, $3);      }
+|   exp "and" exp { TRY_LOGICAL("and", $$, $1, $3); }
+|   exp "or"  exp { TRY_LOGICAL("or", $$, $1, $3);  }
 ;
 
 unop:
@@ -338,10 +427,11 @@ unop:
 
 void yyerror (char const *s) {
     printf("SYNTAX ERROR (%d): %s\n", yylineno, s);
-    exit(1);
+    exit(50);
 }
 
 int main(void) {
+    ctx.new_scope(data_structures::scope_type::NON_LOOP);
     init_shebang();
     #ifdef YYDEBUG
       yydebug = 0;
