@@ -5,5 +5,8 @@
 
 void error_binop(const char* op, lua_things::Type t1, lua_things::Type t2);
 void error_unop(const char* op, lua_things::Type t);
+void error_call(lua_things::Type t);
+void error_index(lua_things::Type t1, lua_things::Type t2);
+void error_break();
 
 #endif
