@@ -14,6 +14,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <exception>
+#include <stdexcept>
 #include "lua_things.hpp"
 #include "data_structures.hpp"
 #include "error_messages.hpp"
@@ -27,6 +29,8 @@ void init_shebang();
 extern char* yytext;
 extern int yylineno;
 extern int yy_flex_debug;
+
+extern std::string scanner_id;
 
 data_structures::context ctx;
 
@@ -49,6 +53,8 @@ namespace tmp {
     std::string last_identifier;
     std::vector<std::string> full_funcname;
     list_type assign_list_type = list_type::VARLIST;
+    list_type prev_assign_list_type = list_type::VARLIST;
+    std::string for_init_id;
 }
 
 }
@@ -84,6 +90,10 @@ namespace tmp {
 
     #define NEW_SCOPE(TYPE)    { ctx.new_scope(data_structures::scope_type::TYPE); }
     #define REMOVE_SCOPE()     { ctx.remove_scope(); }
+
+    #define STORE_LIST_TYPE()    { tmp::prev_assign_list_type = tmp::assign_list_type; }
+    #define TO_EXPLIST()         { tmp::assign_list_type = list_type::EXPLIST; }
+    #define RESTORE_LIST_TYPE()  { tmp::assign_list_type = tmp::prev_assign_list_type; }
 
     #include "parser_utils.cpp"
 }
@@ -238,7 +248,13 @@ stat:
 |   "while" exp "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
 |   "repeat" { NEW_SCOPE(LOOP); } block "until" exp { REMOVE_SCOPE(); }
 |   "if" exp "then" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); } loop_elseif opt_else "end"
-|   "for" IDENTIFIER "=" exp "," exp opt_comma_exp "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
+|   "for" IDENTIFIER { tmp::for_init_id = scanner_id; } "=" exp "," exp opt_comma_exp "do" {
+        NEW_SCOPE(LOOP);
+        #ifdef DLVCDEBUG
+        std::cerr << "for_init_id: " << tmp::for_init_id << std::endl;
+        #endif
+        add_symbol_last_scope(tmp::for_init_id, yylineno, $5);
+    } block "end" { REMOVE_SCOPE(); }
 |   "for" namelist "in" explist "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
 |   "function" funcname {
         UPDATE_IDENTIFIER();
@@ -299,9 +315,19 @@ var:
         }
         #endif
         if (tmp::assign_list_type == list_type::EXPLIST) {
-            $$ = identifier_check(tmp::last_identifier);
+            try {
+                $$ = identifier_check(tmp::last_identifier);
+            } catch (std::exception& e) {
+                error_identifier_dont_exist();
+            }
             tmp::varlist.emplace_back(yytext, var_type::NAME);
         } else {
+            try {
+                $$ = identifier_check(tmp::last_identifier);
+            } catch (std::exception& e) {
+                $$ = lua_things::Type::NIL;
+                // Nothing
+            }
             tmp::namelist.emplace_back(tmp::last_identifier);
         }
     }
@@ -350,12 +376,12 @@ call:
 |   primary ":" IDENTIFIER args    { TRY_CALL($$, $1); }
 |   var args                       { TRY_CALL($$, $1); }
 |   var ":" IDENTIFIER args        { TRY_CALL($$, $1); }
-|   call args                      { TRY_CALL($$, $1); }
+|   call args                      { TRY_CALL($$, $1); RESTORE_LIST_TYPE(); }
 |   call ":" IDENTIFIER args       { TRY_CALL($$, $1); }
 ;
 
 args:
-    "(" opt_explist ")"
+    "(" { STORE_LIST_TYPE(); TO_EXPLIST(); } opt_explist ")"
 |   tableconstructor
 |   STRINGCONST
 ;
