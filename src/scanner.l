@@ -4,8 +4,11 @@
 
 %{
 #include <string_view>
+#include <string>
 #include <stdio.h>
 #include "parser.hpp"
+
+std::string scanner_id;
 %}
 
     /* From Lua 5.3 manual:
@@ -188,7 +191,7 @@ while    return WHILE;
 .|\n      {yymore();}
 } 
 
-{id}  return IDENTIFIER; //printf("id: %s\n", yytext);
+{id}  {scanner_id = yytext; return IDENTIFIER; }
 
 .   {
     printf("LEXICAL ERROR (%d): Unknown symbol %s\n", yylineno, yytext);
