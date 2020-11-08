@@ -118,3 +118,19 @@ lua_things::Type lua_things::check_len(lua_things::Type t) {
         throw lua_things::type_error(type_error_message);
     }
 }
+
+lua_things::Type lua_things::check_call(lua_things::Type t) {
+    if (t == lt::FUNCTION || t == lt::TABLE) {
+        return lt::TABLE;
+    } else {
+        throw lua_things::type_error(type_error_message);
+    }
+}
+
+lua_things::Type lua_things::check_index(lua_things::Type t1, lua_things::Type t2) {
+    if (t1 == lt::TABLE /*&& t2 != lt::NIL*/) {
+        return lt::TABLE;
+    } else {
+        throw lua_things::type_error(type_error_message);
+    }
+}

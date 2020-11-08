@@ -41,6 +41,8 @@ namespace lua_things {
     Type check_arithm(Type t);
     Type check_not(Type t);
     Type check_len(Type t);
+    Type check_call(Type t);
+    Type check_index(Type t1, Type t2);
 }
 
 #endif
