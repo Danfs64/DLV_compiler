@@ -93,7 +93,7 @@ lua_things::Type add_func() {
 lua_things::Type identifier_check(const std::string& identifier ) {
     #ifdef DLVCDEBUG
     std::cerr << "----- identifier_check ------" << std::endl;
-    std::cerr << "Identifier: " << identifier << std::endl;
+    std::cerr << "+++ " << identifier << std::endl;
     #endif
     for (int i = ctx.scope_stack.size()-1; i >= 0; --i) {
         auto& scope = ctx.scope_stack[i];
@@ -104,12 +104,14 @@ lua_things::Type identifier_check(const std::string& identifier ) {
         data_structures::variable_data data = scope.table.var_data(identifier);
         auto type = data.gettype();
         #ifdef DLVCDEBUG
-        std::cerr << lua_things::type_string(type) << std::endl;
+        std::cerr << "%%% " << lua_things::type_string(type) << std::endl;
         std::cerr << "-----------" << std::endl;
         #endif
         return type;
     }
-
-    std::cout << "(" << yylineno << "): Identifier " << identifier << " does not exists.\n";
-    exit(1);
+    #ifdef DLVCDEBUG
+    std::cerr << "Nothing found" << std::endl;
+    std::cerr << "-------------------------------------------------" << std::endl;
+    #endif
+    throw std::runtime_error("identifier does not exists.\n");
 }
