@@ -15,4 +15,5 @@ namespace global {
     list_type assign_list_type;
     list_type prev_assign_list_type;
     std::string for_init_id;
+    const std::string null_identifier;
 }
