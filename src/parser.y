@@ -288,7 +288,7 @@ var:
             try {
                 $$ = identifier_check(global::last_identifier);
             } catch (std::exception& e) {
-                error_identifier_dont_exist();
+                error_identifier_dont_exist(global::last_identifier);
             }
             global::varlist.emplace_back(yytext, var_type::NAME);
         } else {
