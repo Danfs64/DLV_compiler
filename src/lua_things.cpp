@@ -64,11 +64,12 @@ lua_things::Type lua_things::check_order(lua_things::Type t1, lua_things::Type t
 } 
 
 lua_things::Type lua_things::check_logical(lua_things::Type t1, lua_things::Type t2) { 
-    if (t1 == lt::TABLE || t2 == lt::TABLE) { 
-        return lt::TABLE;
-    } else {
-        return lt::BOOL;
-    }
+//     if (t1 == lt::TABLE || t2 == lt::TABLE) { 
+//         return lt::TABLE;
+//     } else {
+//         return lt::BOOL;
+//     }
+    return lt::TABLE;
 }
 
 lua_things::Type lua_things::check_bitwise(lua_things::Type t1, lua_things::Type t2) { 
