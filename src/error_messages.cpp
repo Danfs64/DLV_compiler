@@ -3,9 +3,16 @@
 #include <memory>
 #include <iostream>
 #include <stdio.h>
+#include <cstring>
+#include <string>
 #include "lua_things.hpp"
 
 extern int yylineno;
+
+void print_semerror_start() {
+    const char* message_template = "SEMANTIC ERROR (%d): ";
+    printf(message_template, yylineno);
+}
 
 void error_binop(const char* op, lua_things::Type t1, lua_things::Type t2) {
     const char* message_template = "Type error (%d) for operator %s, lhs is %s and rhs is %s\n";
@@ -43,17 +50,15 @@ void error_index(lua_things::Type t1, lua_things::Type t2) {
 }
 
 void error_break() {
-    const char* message_template = "(%d) break used in a non-loop block.\n";
-    char error_string[100];
-    sprintf(error_string, message_template, yylineno);
-    std::cerr << error_string;
+    print_semerror_start();
+    const char* message_template = "break used in a non-loop block.\n";
+    std::cerr << message_template;
     exit(6);
 }
 
 void error_identifier_dont_exist() {
-    const char* message_template = "(%d) id dont exist.\n";
-    char error_string[100];
-    sprintf(error_string, message_template, yylineno);
-    std::cerr << error_string;
+    print_semerror_start();
+    const char* message_template = "id dont exist.\n";
+    std::cerr << message_template;
     exit(7);
 }
