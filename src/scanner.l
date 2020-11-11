@@ -7,8 +7,8 @@
 #include <string>
 #include <stdio.h>
 #include "parser.hpp"
+#include "common_utils.hpp"
 
-std::string scanner_id;
 %}
 
     /* From Lua 5.3 manual:
@@ -191,7 +191,7 @@ while    return WHILE;
 .|\n      {yymore();}
 } 
 
-{id}  {scanner_id = yytext; return IDENTIFIER; }
+{id}  {global::last_identifier = yytext; return IDENTIFIER; }
 
 .   {
     printf("LEXICAL ERROR (%d): Unknown symbol %s\n", yylineno, yytext);
