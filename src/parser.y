@@ -140,7 +140,12 @@ opt_comma_exp:
 
 opt_parlist:
     %empty
-|   parlist
+|   parlist  {
+        for (const auto& name : global::namelist) {
+            add_symbol_last_scope(name, yylineno, lua_things::Type::TABLE);
+        }
+        global::namelist.clear();
+    }
 ;
 
 opt_eq_explist:
@@ -160,7 +165,7 @@ opt_col_name:
 
 opt_comma_elip:
     %empty
-|   "," "..."
+|   "," "..."       { global::namelist.emplace_back("..."); }
 ;
 
 opt_fieldlist:
@@ -301,9 +306,9 @@ var:
             global::namelist.emplace_back(global::last_identifier);
         }
     }
-|   primary index  { TRY_INDEX($$, $1, $2); }
-|   var index      { TRY_INDEX($$, $1, $2); }
-|   call index     { TRY_INDEX($$, lua_things::Type::TABLE, $2); }
+|   primary index  { TRY_INDEX($$, $1, $2);                       global::namelist.pop_back(); global::namelist.emplace_back(global::null_identifier); }
+|   var index      { TRY_INDEX($$, $1, $2);                       global::namelist.pop_back(); global::namelist.emplace_back(global::null_identifier); }
+|   call index     { TRY_INDEX($$, lua_things::Type::TABLE, $2);  global::namelist.pop_back(); global::namelist.emplace_back(global::null_identifier); }
 ;
 
 index:
@@ -312,8 +317,8 @@ index:
 ;
 
 namelist:
-    IDENTIFIER                 { global::namelist.emplace_back(yytext); }
-|   namelist "," IDENTIFIER    { global::namelist.emplace_back(yytext); }
+    IDENTIFIER                 { global::namelist.emplace_back(global::last_identifier); }
+|   namelist "," IDENTIFIER    { global::namelist.emplace_back(global::last_identifier); }
 ;
 
 explist:
@@ -357,7 +362,7 @@ args:
 ;
 
 functiondef:
-    "function"  funcbody
+    "function" { ctx.new_scope(data_structures::scope_type::FUNCTION); } funcbody { ctx.remove_scope(); }
 ;
 
 funcbody:
@@ -365,8 +370,8 @@ funcbody:
 ;
 
 parlist:
-   namelist opt_comma_elip
-|  "..."
+   namelist opt_comma_elip   
+|  "..."                     { global::namelist.emplace_back("..."); }
 ;
 
 tableconstructor:
@@ -431,6 +436,7 @@ int main(void) {
     global::prev_assign_list_type = list_type::VARLIST;
     
     ctx.new_scope(data_structures::scope_type::NON_LOOP);
+    add_builtin();
     init_shebang();
     #ifdef YYDEBUG
       yydebug = 0;
