@@ -1,6 +1,7 @@
 #ifndef DATA_STRUCTURES_HPP
 #define DATA_STRUCTURES_HPP
 
+#include <iostream>
 #include <string>
 #include <map>
 #include <tuple>
