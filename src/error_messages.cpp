@@ -66,7 +66,7 @@ void error_identifier_dont_exist(const std::string& id) {
     const char* message_template = "identifier '%s' does not exist.\n";
     auto c_id = std::make_unique<char[]>(id.size() + 2);
     std::strcpy(c_id.get(), id.c_str());
-    auto error_message = std::make_unique<char[]>(std::strlen(message_template + id.size()));
+    auto error_message = std::make_unique<char[]>(std::strlen(message_template) + id.size());
     std::sprintf(error_message.get(), message_template, c_id.get());
     std::cerr << error_message.get();
     std::exit(7);
