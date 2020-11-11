@@ -19,6 +19,8 @@
 #include "lua_things.hpp"
 #include "data_structures.hpp"
 #include "error_messages.hpp"
+#include "common_utils.hpp"
+#include "parser_utils.hpp"
 
 #define YYSTYPE lua_things::Type
 
@@ -30,32 +32,7 @@ extern char* yytext;
 extern int yylineno;
 extern int yy_flex_debug;
 
-extern std::string scanner_id;
-
 data_structures::context ctx;
-
-enum class var_type : int {
-    NAME,
-    INDEX,
-};
-
-enum class list_type : int {
-    VARLIST,
-    EXPLIST,
-    NO_TYPE,
-};
-
-namespace tmp {
-    std::vector<std::string> namelist;
-    std::vector<lua_things::Type> explist;
-    data_structures::assign_type assign_type;
-    std::vector<std::tuple<std::string, var_type>> varlist;
-    std::string last_identifier;
-    std::vector<std::string> full_funcname;
-    list_type assign_list_type = list_type::VARLIST;
-    list_type prev_assign_list_type = list_type::VARLIST;
-    std::string for_init_id;
-}
 
 }
 
@@ -82,20 +59,16 @@ namespace tmp {
 
     #define TRY_INDEX(vf, v1, v2)  { try { vf = lua_things::check_index(v1, v2); } catch (std::exception& e) { error_index(v1, v2); } }
 
-    #define ASSIGN_LOCAL() tmp::assign_type = data_structures::assign_type::LOCAL
-    #define ASSIGN_GLOBAL() tmp::assign_type = data_structures::assign_type::GLOBAL
-    #define ASSIGN_AND_CLEAR() { add_assign_list(); tmp::namelist.clear(); tmp::explist.clear(); }
-
-    #define UPDATE_IDENTIFIER() { tmp::last_identifier = yytext; }
+    #define ASSIGN_LOCAL()       { global::assign_type = data_structures::assign_type::LOCAL;            }
+    #define ASSIGN_GLOBAL()      { global::assign_type = data_structures::assign_type::GLOBAL;           }
+    #define ASSIGN_AND_CLEAR()   { add_assign_list(); global::namelist.clear(); global::explist.clear(); }
 
     #define NEW_SCOPE(TYPE)    { ctx.new_scope(data_structures::scope_type::TYPE); }
     #define REMOVE_SCOPE()     { ctx.remove_scope(); }
 
-    #define STORE_LIST_TYPE()    { tmp::prev_assign_list_type = tmp::assign_list_type; }
-    #define TO_EXPLIST()         { tmp::assign_list_type = list_type::EXPLIST; }
-    #define RESTORE_LIST_TYPE()  { tmp::assign_list_type = tmp::prev_assign_list_type; }
-
-    #include "parser_utils.cpp"
+    #define STORE_LIST_TYPE()    { global::prev_assign_list_type = global::assign_list_type; }
+    #define TO_EXPLIST()         { global::assign_list_type = list_type::EXPLIST; }
+    #define RESTORE_LIST_TYPE()  { global::assign_list_type = global::prev_assign_list_type; }
 }
 
 %token	IDENTIFIER STRINGCONST INTCONST FLOATCONST
@@ -182,7 +155,7 @@ opt_explist:
 
 opt_col_name:
     %empty
-|   ":" IDENTIFIER  { UPDATE_IDENTIFIER(); tmp::full_funcname.emplace_back(tmp::last_identifier); }
+|   ":" IDENTIFIER  { global::full_funcname.emplace_back(global::last_identifier); }
 ;
 
 opt_comma_elip:
@@ -214,7 +187,7 @@ loop_elseif:
 
 loop_dot_name:
     %empty
-|   loop_dot_name "." IDENTIFIER { UPDATE_IDENTIFIER(); tmp::full_funcname.emplace_back(tmp::last_identifier); }
+|   loop_dot_name "." IDENTIFIER { global::full_funcname.emplace_back(global::last_identifier); }
 ;
 
 loop_fields:
@@ -235,10 +208,10 @@ block:
 stat:
     ";"
 |   varlist "=" {
-        tmp::assign_list_type = list_type::EXPLIST;
+        global::assign_list_type = list_type::EXPLIST;
     } explist {
         ASSIGN_AND_CLEAR();
-        tmp::assign_list_type = list_type::VARLIST;
+        global::assign_list_type = list_type::VARLIST;
     }
 |   call                            %prec ";"
 |   label
@@ -248,25 +221,23 @@ stat:
 |   "while" exp "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
 |   "repeat" { NEW_SCOPE(LOOP); } block "until" exp { REMOVE_SCOPE(); }
 |   "if" exp "then" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); } loop_elseif opt_else "end"
-|   "for" IDENTIFIER { tmp::for_init_id = scanner_id; } "=" exp "," exp opt_comma_exp "do" {
+|   "for" IDENTIFIER { global::for_init_id = global::last_identifier; } "=" exp "," exp opt_comma_exp "do" {
         NEW_SCOPE(LOOP);
         #ifdef DLVCDEBUG
-        std::cerr << "for_init_id: " << tmp::for_init_id << std::endl;
+        std::cerr << "for_init_id: " << global::for_init_id << std::endl;
         #endif
-        add_symbol_last_scope(tmp::for_init_id, yylineno, $5);
+        add_symbol_last_scope(global::for_init_id, yylineno, $5);
     } block "end" { REMOVE_SCOPE(); }
 |   "for" namelist "in" explist "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
 |   "function" funcname {
-        UPDATE_IDENTIFIER();
-        add_symbol_global_scope(tmp::full_funcname.at(0), yylineno, $2);
-        tmp::full_funcname.clear();
+        add_symbol_global_scope(global::full_funcname.at(0), yylineno, $2);
+        global::full_funcname.clear();
         ctx.new_scope(data_structures::scope_type::FUNCTION);
     } funcbody {
         ctx.remove_scope();
     }
 |   "local" "function" IDENTIFIER {
-        UPDATE_IDENTIFIER();
-        add_symbol_last_scope(tmp::last_identifier, yylineno, lua_things::Type::FUNCTION);
+        add_symbol_last_scope(global::last_identifier, yylineno, lua_things::Type::FUNCTION);
         ctx.new_scope(data_structures::scope_type::FUNCTION);
     } funcbody {
         ctx.remove_scope();
@@ -274,11 +245,11 @@ stat:
 |   "local" {
         ASSIGN_LOCAL();
     }  namelist {
-        tmp::assign_list_type = list_type::EXPLIST;
+        global::assign_list_type = list_type::EXPLIST;
     } opt_eq_explist {
         ASSIGN_AND_CLEAR();
         ASSIGN_GLOBAL();
-        tmp::assign_list_type = list_type::VARLIST;
+        global::assign_list_type = list_type::VARLIST;
     }
 ;
 
@@ -290,7 +261,7 @@ label:
 ;
 
 funcname:
-    IDENTIFIER { UPDATE_IDENTIFIER(); tmp::full_funcname.emplace_back(tmp::last_identifier); } loop_dot_name opt_col_name  { $$ = add_func(); }
+    IDENTIFIER { global::full_funcname.emplace_back(global::last_identifier); } loop_dot_name opt_col_name  { $$ = add_func(); }
 ;
 
 varlist:
@@ -299,10 +270,9 @@ varlist:
 
 var:
     IDENTIFIER {
-        UPDATE_IDENTIFIER();
         #ifdef DLVCDEBUG
         std::cerr << "-------- Acessing identifier --------" << std::endl;
-        switch (tmp::assign_list_type) {
+        switch (global::assign_list_type) {
             case list_type::VARLIST:
                 std::cerr << "LIST_TYPE: VARLIST" << std::endl;
                 break;
@@ -314,21 +284,21 @@ var:
                 break;
         }
         #endif
-        if (tmp::assign_list_type == list_type::EXPLIST) {
+        if (global::assign_list_type == list_type::EXPLIST) {
             try {
-                $$ = identifier_check(tmp::last_identifier);
+                $$ = identifier_check(global::last_identifier);
             } catch (std::exception& e) {
                 error_identifier_dont_exist();
             }
-            tmp::varlist.emplace_back(yytext, var_type::NAME);
+            global::varlist.emplace_back(yytext, var_type::NAME);
         } else {
             try {
-                $$ = identifier_check(tmp::last_identifier);
+                $$ = identifier_check(global::last_identifier);
             } catch (std::exception& e) {
                 $$ = lua_things::Type::NIL;
                 // Nothing
             }
-            tmp::namelist.emplace_back(tmp::last_identifier);
+            global::namelist.emplace_back(global::last_identifier);
         }
     }
 |   primary index  { TRY_INDEX($$, $1, $2); }
@@ -342,13 +312,13 @@ index:
 ;
 
 namelist:
-    IDENTIFIER                 { tmp::namelist.emplace_back(yytext); }
-|   namelist "," IDENTIFIER    { tmp::namelist.emplace_back(yytext); }
+    IDENTIFIER                 { global::namelist.emplace_back(yytext); }
+|   namelist "," IDENTIFIER    { global::namelist.emplace_back(yytext); }
 ;
 
 explist:
-    exp                   { tmp::explist.emplace_back($1); }
-|   explist "," exp       { tmp::explist.emplace_back($3); }
+    exp                   { global::explist.emplace_back($1); }
+|   explist "," exp       { global::explist.emplace_back($3); }
 ;
 
 exp:
@@ -457,6 +427,9 @@ void yyerror (char const *s) {
 }
 
 int main(void) {
+    global::assign_list_type = list_type::VARLIST;
+    global::prev_assign_list_type = list_type::VARLIST;
+    
     ctx.new_scope(data_structures::scope_type::NON_LOOP);
     init_shebang();
     #ifdef YYDEBUG

@@ -1,3 +1,9 @@
+#include "common_utils.hpp"
+#include "lua_things.hpp"
+#include "data_structures.hpp"
+
+extern data_structures::context ctx;
+extern int yylineno;
 
 void add_symbol_last_scope(const char *Name, int lineno, lua_things::Type type) {
     auto& last_scope = ctx.last_scope();
@@ -43,10 +49,10 @@ void add_label(const char* label_name) {
 void add_assign_list() {
     #ifdef DLVCDEBUG
     std::cerr << "----- add_assign_list ------" << std::endl;
-    std::cerr << "Number of expressions: " << tmp::explist.size() << std::endl;
-    std::cerr << "Number of variables/names: " << tmp::namelist.size() << std::endl;
+    std::cerr << "Number of expressions: " << global::explist.size() << std::endl;
+    std::cerr << "Number of variables/names: " << global::namelist.size() << std::endl;
     #endif
-    if (tmp::explist.size() > 0 && tmp::namelist.size() != tmp::explist.size()) {
+    if (global::explist.size() > 0 && global::namelist.size() != global::explist.size()) {
         /*
         TODO: verificar quando o último for uma chamada de função
         */
@@ -55,17 +61,17 @@ void add_assign_list() {
         exit(1);
     }
 
-    auto& scope = tmp::assign_type == data_structures::assign_type::LOCAL
+    auto& scope = global::assign_type == data_structures::assign_type::LOCAL
                   ? ctx.last_scope()
                   : ctx.global_scope();
-    if (tmp::explist.size() == 0) {
-        for (const auto& i : tmp::namelist) {
+    if (global::explist.size() == 0) {
+        for (const auto& i : global::namelist) {
             scope.table.add_var(i, yylineno, lua_things::Type::NIL);
         }
     } else {
-        for (size_t i = 0; i < tmp::namelist.size(); ++i) {
-            const auto& name = tmp::namelist[i];
-            const auto& exp_type = tmp::explist[i];
+        for (size_t i = 0; i < global::namelist.size(); ++i) {
+            const auto& name = global::namelist[i];
+            const auto& exp_type = global::explist[i];
 
             #ifdef DLVCDEBUG
             std::cerr << "+++ " << name << std::endl;
@@ -81,11 +87,11 @@ void add_assign_list() {
 }
 
 lua_things::Type add_func() {
-    if (tmp::full_funcname.size() > 1) {
-        add_symbol_last_scope(tmp::full_funcname[0], yylineno, lua_things::Type::TABLE);
+    if (global::full_funcname.size() > 1) {
+        add_symbol_last_scope(global::full_funcname[0], yylineno, lua_things::Type::TABLE);
         return lua_things::Type::TABLE;
     } else {
-        add_symbol_last_scope(tmp::full_funcname[0], yylineno, lua_things::Type::FUNCTION);
+        add_symbol_last_scope(global::full_funcname[0], yylineno, lua_things::Type::FUNCTION);
         return lua_things::Type::FUNCTION;
     }
 }
