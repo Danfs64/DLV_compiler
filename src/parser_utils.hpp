@@ -17,5 +17,6 @@ void add_label(const char* label_name);
 void add_assign_list();
 lua_things::Type add_func();
 lua_things::Type identifier_check(const std::string& identifier);
+void add_builtin();
 
 #endif

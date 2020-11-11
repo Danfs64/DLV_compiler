@@ -1,3 +1,6 @@
+#include <array>
+#include <iostream>
+#include <tuple>
 #include "common_utils.hpp"
 #include "lua_things.hpp"
 #include "data_structures.hpp"
@@ -120,4 +123,49 @@ lua_things::Type identifier_check(const std::string& identifier ) {
     std::cerr << "-------------------------------------------------" << std::endl;
     #endif
     throw std::runtime_error("identifier does not exists.\n");
+}
+
+void add_builtin() {
+    const constexpr std::array builtin {
+        std::tuple{"rawget", lua_things::Type::FUNCTION},
+        std::tuple{"utf8", lua_things::Type::TABLE},
+        std::tuple{"assert", lua_things::Type::FUNCTION},
+        std::tuple{"coroutine", lua_things::Type::TABLE},
+        std::tuple{"tostring", lua_things::Type::FUNCTION},
+        std::tuple{"error", lua_things::Type::FUNCTION},
+        std::tuple{"pcall", lua_things::Type::FUNCTION},
+        std::tuple{"rawequal", lua_things::Type::FUNCTION},
+        std::tuple{"os", lua_things::Type::TABLE},
+        std::tuple{"type", lua_things::Type::FUNCTION},
+        std::tuple{"require", lua_things::Type::FUNCTION},
+        std::tuple{"tonumber", lua_things::Type::FUNCTION},
+        std::tuple{"loadfile", lua_things::Type::FUNCTION},
+        std::tuple{"arg", lua_things::Type::TABLE},
+        std::tuple{"load", lua_things::Type::FUNCTION},
+        std::tuple{"package", lua_things::Type::TABLE},
+        std::tuple{"debug", lua_things::Type::TABLE},
+        std::tuple{"ipairs", lua_things::Type::FUNCTION},
+        std::tuple{"xpcall", lua_things::Type::FUNCTION},
+        std::tuple{"table", lua_things::Type::TABLE},
+        std::tuple{"dofile", lua_things::Type::FUNCTION},
+        std::tuple{"bit32", lua_things::Type::TABLE},
+        std::tuple{"math", lua_things::Type::TABLE},
+        std::tuple{"string", lua_things::Type::TABLE},
+        std::tuple{"setmetatable", lua_things::Type::FUNCTION},
+        std::tuple{"io", lua_things::Type::TABLE},
+        std::tuple{"_VERSION", lua_things::Type::STR},
+        std::tuple{"next", lua_things::Type::FUNCTION},
+        std::tuple{"collectgarbage", lua_things::Type::FUNCTION},
+        std::tuple{"rawset", lua_things::Type::FUNCTION},
+        std::tuple{"getmetatable", lua_things::Type::FUNCTION},
+        std::tuple{"print", lua_things::Type::FUNCTION},
+        std::tuple{"select", lua_things::Type::FUNCTION},
+        std::tuple{"_G", lua_things::Type::TABLE},
+        std::tuple{"pairs", lua_things::Type::FUNCTION},
+        std::tuple{"rawlen", lua_things::Type::FUNCTION},
+    };
+
+    for (const auto &[id, type] : builtin) {
+        add_symbol_global_scope(id, 0, type);
+    }
 }
