@@ -61,7 +61,8 @@ data_structures::context ctx;
 
     #define ASSIGN_LOCAL()       { global::assign_type = data_structures::assign_type::LOCAL;            }
     #define ASSIGN_GLOBAL()      { global::assign_type = data_structures::assign_type::GLOBAL;           }
-    #define ASSIGN_AND_CLEAR()   { add_assign_list(); global::namelist.clear(); global::explist.clear(); }
+    #define CLEAR_NAME_EXP()     { global::namelist.clear(); global::explist.clear(); }
+    #define ASSIGN_AND_CLEAR()   { add_assign_list(); CLEAR_NAME_EXP(); }
 
     #define NEW_SCOPE(TYPE)    { ctx.new_scope(data_structures::scope_type::TYPE); }
     #define REMOVE_SCOPE()     { ctx.remove_scope(); }
@@ -165,7 +166,7 @@ opt_col_name:
 
 opt_comma_elip:
     %empty
-|   "," "..."       { global::namelist.emplace_back("..."); }
+|   "," "..."       { add_namelist("..."); }
 ;
 
 opt_fieldlist:
@@ -213,19 +214,22 @@ block:
 stat:
     ";"
 |   varlist "=" {
+        #ifdef DLVCDEBUG
+        std::cerr << "after varlist" << std::endl;
+        #endif
         global::assign_list_type = list_type::EXPLIST;
     } explist {
         ASSIGN_AND_CLEAR();
         global::assign_list_type = list_type::VARLIST;
     }
-|   call                            %prec ";"
+|   call                            %prec ";"                    { CLEAR_NAME_EXP(); } 
 |   label
 |   "break" { if(!ctx.verify_break()) { error_break(); } }
 |   "goto" IDENTIFIER
 |   "do" { NEW_SCOPE(NON_LOOP); } block "end" { REMOVE_SCOPE(); }
 |   "while" exp "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
 |   "repeat" { NEW_SCOPE(LOOP); } block "until" exp { REMOVE_SCOPE(); }
-|   "if" exp "then" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); } loop_elseif opt_else "end"
+|   "if" exp { CLEAR_NAME_EXP(); } "then" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); } loop_elseif opt_else "end" { CLEAR_NAME_EXP(); }
 |   "for" IDENTIFIER { global::for_init_id = global::last_identifier; } "=" exp "," exp opt_comma_exp "do" {
         NEW_SCOPE(LOOP);
         #ifdef DLVCDEBUG
@@ -253,6 +257,9 @@ stat:
         global::assign_list_type = list_type::EXPLIST;
     } opt_eq_explist {
         ASSIGN_AND_CLEAR();
+        #ifdef DLVCDEBUG
+        std::cerr << "ASSIGN_AND_CLEAR | namelist size: " << global::namelist.size() << std::endl;
+        #endif
         ASSIGN_GLOBAL();
         global::assign_list_type = list_type::VARLIST;
     }
@@ -277,6 +284,7 @@ var:
     IDENTIFIER {
         #ifdef DLVCDEBUG
         std::cerr << "-------- Acessing identifier --------" << std::endl;
+        std::cerr << "ID: " << global::last_identifier << std::endl;
         switch (global::assign_list_type) {
             case list_type::VARLIST:
                 std::cerr << "LIST_TYPE: VARLIST" << std::endl;
@@ -292,23 +300,24 @@ var:
         if (global::assign_list_type == list_type::EXPLIST) {
             try {
                 $$ = identifier_check(global::last_identifier);
+                if (global::assign_type != data_structures::assign_type::LOCAL)
+                    add_namelist(global::last_identifier);
             } catch (std::exception& e) {
                 error_identifier_dont_exist(global::last_identifier);
+                // add_namelist(global::null_identifier);
             }
-            global::varlist.emplace_back(yytext, var_type::NAME);
         } else {
             try {
                 $$ = identifier_check(global::last_identifier);
             } catch (std::exception& e) {
                 $$ = lua_things::Type::NIL;
-                // Nothing
             }
-            global::namelist.emplace_back(global::last_identifier);
+            add_namelist(global::last_identifier);
         }
     }
-|   primary index  { TRY_INDEX($$, $1, $2);                       global::namelist.pop_back(); global::namelist.emplace_back(global::null_identifier); }
-|   var index      { TRY_INDEX($$, $1, $2);                       global::namelist.pop_back(); global::namelist.emplace_back(global::null_identifier); }
-|   call index     { TRY_INDEX($$, lua_things::Type::TABLE, $2);  global::namelist.pop_back(); global::namelist.emplace_back(global::null_identifier); }
+|   primary index  { TRY_INDEX($$, $1, $2);                       pop_namelist(); add_namelist(global::null_identifier); }
+|   var index      { TRY_INDEX($$, $1, $2);                       pop_namelist(); add_namelist(global::null_identifier); }
+|   call index     { TRY_INDEX($$, lua_things::Type::TABLE, $2);  pop_namelist(); add_namelist(global::null_identifier); }
 ;
 
 index:
@@ -317,13 +326,13 @@ index:
 ;
 
 namelist:
-    IDENTIFIER                 { global::namelist.emplace_back(global::last_identifier); }
-|   namelist "," IDENTIFIER    { global::namelist.emplace_back(global::last_identifier); }
+    IDENTIFIER                 { add_namelist(global::last_identifier); }
+|   namelist "," IDENTIFIER    { add_namelist(global::last_identifier); }
 ;
 
 explist:
-    exp                   { global::explist.emplace_back($1); }
-|   explist "," exp       { global::explist.emplace_back($3); }
+    exp                   { add_explist($1); }
+|   explist "," exp       { add_explist($3); }
 ;
 
 exp:
@@ -356,7 +365,7 @@ call:
 ;
 
 args:
-    "(" { STORE_LIST_TYPE(); TO_EXPLIST(); } opt_explist ")"
+    "(" { STORE_LIST_TYPE(); TO_EXPLIST(); global::is_args = true; } opt_explist ")" { RESTORE_LIST_TYPE(); global::is_args = false; }
 |   tableconstructor
 |   STRINGCONST
 ;
@@ -371,7 +380,7 @@ funcbody:
 
 parlist:
    namelist opt_comma_elip   
-|  "..."                     { global::namelist.emplace_back("..."); }
+|  "..."                     { add_namelist("..."); }
 ;
 
 tableconstructor:
@@ -418,10 +427,10 @@ binop:
 ;
 
 unop:
-    "-"   exp     %prec "not" { TRY_UARITHM("-", $$, $1);  }
-|   "not" exp                 { TRY_NOT("not", $$, $1);    }
-|   "#"   exp                 { TRY_LEN("#", $$, $1);      }
-|   "~"   exp     %prec "not" { TRY_UBITWISE("~", $$, $1); }
+    "-"   exp     %prec "not" { TRY_UARITHM("-", $$, $2);  }
+|   "not" exp                 { TRY_NOT("not", $$, $2);    }
+|   "#"   exp                 { TRY_LEN("#", $$, $2);      }
+|   "~"   exp     %prec "not" { TRY_UBITWISE("~", $$, $2); }
 ;
 
 %%
