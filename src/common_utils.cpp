@@ -16,4 +16,5 @@ namespace global {
     list_type prev_assign_list_type;
     std::string for_init_id;
     const std::string null_identifier;
+    bool is_args = false;
 }

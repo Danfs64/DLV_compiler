@@ -8,7 +8,10 @@
 #include "lua_things.hpp"
 #include "data_structures.hpp"
 
-
+void add_namelist(const std::string& name);
+void pop_namelist();
+void add_explist(lua_things::Type type);
+void pop_explist();
 void add_symbol_last_scope(const char *Name, int lineno, lua_things::Type type);
 void add_symbol_last_scope(const std::string& Name, int lineno, lua_things::Type type);
 void add_symbol_global_scope(const char *Name, int lineno, lua_things::Type type);

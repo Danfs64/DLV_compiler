@@ -32,6 +32,7 @@ namespace global {
     extern list_type prev_assign_list_type;
     extern std::string for_init_id;
     extern const std::string null_identifier;
+    extern bool is_args;
 }
 #endif // common_utils_hpp_INCLUDED
 
