@@ -58,6 +58,21 @@ void add_explist(lua_things::Type type) {
     #endif
 }
 
+void add_explist(lua_things::expression type) {
+    #ifdef DLVCDEBUG
+    std::cerr << "----- add_explist ------ " << yylineno << std::endl;
+    #endif
+    if (global::assign_list_type == list_type::EXPLIST and !global::is_args) {
+        #ifdef DLVCDEBUG
+        std::cerr << "~~~ " << lua_things::type_string(type.type) << std::endl;
+        #endif
+        global::explist.emplace_back(type);
+    }
+    #ifdef DLVCDEBUG
+    std::cerr << "-------------------------------------------------" << std::endl;
+    #endif
+}
+
 void pop_explist() {
     #ifdef DLVCDEBUG
     std::cerr << "----- pop_explist ------ " << yylineno << std::endl;
@@ -134,7 +149,7 @@ void add_assign_list() {
             std::cerr << "¢¢¢ " << i << std::endl;
         }
         for (const auto& i : global::explist) {
-            std::cerr << "§§§ " << lua_things::type_string(i) << std::endl;
+            std::cerr << "§§§ " << lua_things::type_string(i.type) << std::endl;
         }
         #endif
 
@@ -157,9 +172,9 @@ void add_assign_list() {
 
             #ifdef DLVCDEBUG
             std::cerr << "+++ " << name << std::endl;
-            std::cerr << "%%% " <<lua_things::type_string(exp_type) << std::endl;
+            std::cerr << "%%% " <<lua_things::type_string(exp_type.type) << std::endl;
             #endif
-            scope.table.add_var(name, yylineno, exp_type);
+            scope.table.add_var(name, yylineno, exp_type.type);
         }
     }
 

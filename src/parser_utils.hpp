@@ -10,6 +10,7 @@
 
 void add_namelist(const std::string& name);
 void pop_namelist();
+void add_explist(lua_things::expression type);
 void add_explist(lua_things::Type type);
 void pop_explist();
 void add_symbol_last_scope(const char *Name, int lineno, lua_things::Type type);

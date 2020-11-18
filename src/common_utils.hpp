@@ -23,7 +23,7 @@ namespace global {
      * organização.
      */
     extern std::vector<std::string> namelist;
-    extern std::vector<lua_things::Type> explist;
+    extern std::vector<lua_things::expression> explist;
     extern data_structures::assign_type assign_type;
     extern std::vector<std::tuple<std::string, var_type>> varlist;
     extern std::string last_identifier;
@@ -33,6 +33,7 @@ namespace global {
     extern std::string for_init_id;
     extern const std::string null_identifier;
     extern bool is_args;
+    extern bool is_index;
 }
 #endif // common_utils_hpp_INCLUDED
 

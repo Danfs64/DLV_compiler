@@ -22,7 +22,10 @@
 #include "common_utils.hpp"
 #include "parser_utils.hpp"
 
-#define YYSTYPE lua_things::Type
+#define YYSTYPE lua_things::expression
+
+using luat = lua_things::Type;
+using luae = lua_things::expression;
 
 int yylex();
 void yyerror(const char*);
@@ -38,7 +41,7 @@ data_structures::context ctx;
 
 %code {
     /* Utility macros and functions */
-    #define TRY_OP(bop, vf, v1, v2, func)  { try { vf = func(v1, v2); } catch (std::exception& e) { std::cout << e.what();  error_binop( bop , v1, v2); } }
+    #define TRY_OP(bop, vf, v1, v2, func)  { try { vf = func(v1, v2); } catch (std::exception& e) { std::cout << e.what();  error_binop( bop , (v1).type, (v2).type); } }
 
     #define TRY_ARITHM(bop, vf, v1, v2)  TRY_OP(bop, vf, v1, v2, lua_things::check_arithm)
     #define TRY_EQ(bop, vf, v1, v2)      TRY_OP(bop, vf, v1, v2, lua_things::check_eq)
@@ -48,16 +51,16 @@ data_structures::context ctx;
     #define TRY_LOGICAL(bop, vf, v1, v2) TRY_OP(bop, vf, v1, v2, lua_things::check_logical)
     #define TRY_BITWISE(bop, vf, v1, v2) TRY_OP(bop, vf, v1, v2, lua_things::check_bitwise)
 
-    #define TRY_UOP(uop, vf, v, func) { try { vf = func(v); } catch (std::exception& e) { error_unop( uop , v); } }
+    #define TRY_UOP(uop, vf, v, func) { try { vf = func(v); } catch (std::exception& e) { error_unop(uop , (v).type); } }
 
     #define TRY_UARITHM(uop, vf, v)   TRY_UOP(uop, vf, v, lua_things::check_arithm)
     #define TRY_UBITWISE(uop, vf, v)  TRY_UOP(uop, vf, v, lua_things::check_bitwise)
     #define TRY_NOT(uop, vf, v)       TRY_UOP(uop, vf, v, lua_things::check_not)
     #define TRY_LEN(uop, vf, v)       TRY_UOP(uop, vf, v, lua_things::check_len)
 
-    #define TRY_CALL(vf, v)  { try { vf = lua_things::check_call(v); } catch (std::exception& e) { error_call(v); } }
+    #define TRY_CALL(vf, v)  { try { vf = lua_things::check_call(v); } catch (std::exception& e) { error_call((v).type); } }
 
-    #define TRY_INDEX(vf, v1, v2)  { try { vf = lua_things::check_index(v1, v2); } catch (std::exception& e) { error_index(v1, v2); } }
+    #define TRY_INDEX(vf, v1, v2)  { try { vf = lua_things::check_index(v1, v2); } catch (std::exception& e) { error_index((v1).type, (v2).type); } }
 
     #define ASSIGN_LOCAL()       { global::assign_type = data_structures::assign_type::LOCAL;            }
     #define ASSIGN_GLOBAL()      { global::assign_type = data_structures::assign_type::GLOBAL;           }
@@ -235,11 +238,11 @@ stat:
         #ifdef DLVCDEBUG
         std::cerr << "for_init_id: " << global::for_init_id << std::endl;
         #endif
-        add_symbol_last_scope(global::for_init_id, yylineno, $5);
+        add_symbol_last_scope(global::for_init_id, yylineno, ($5).type);
     } block "end" { REMOVE_SCOPE(); }
 |   "for" namelist "in" explist "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
 |   "function" funcname {
-        add_symbol_global_scope(global::full_funcname.at(0), yylineno, $2);
+        add_symbol_global_scope(global::full_funcname.at(0), yylineno, ($2).type);
         global::full_funcname.clear();
         ctx.new_scope(data_structures::scope_type::FUNCTION);
     } funcbody {
@@ -297,27 +300,31 @@ var:
                 break;
         }
         #endif
-        if (global::assign_list_type == list_type::EXPLIST) {
-            try {
-                $$ = identifier_check(global::last_identifier);
-                if (global::assign_type != data_structures::assign_type::LOCAL)
-                    add_namelist(global::last_identifier);
-            } catch (std::exception& e) {
-                error_identifier_dont_exist(global::last_identifier);
-                // add_namelist(global::null_identifier);
+        if (global::is_index) {
+            if (global::assign_list_type == list_type::EXPLIST) {
+                try {
+                    $$ = identifier_check(global::last_identifier);
+                    if (global::assign_type != data_structures::assign_type::LOCAL)
+                        add_namelist(global::last_identifier);
+                } catch (std::exception& e) {
+                    error_identifier_dont_exist(global::last_identifier);
+                    // add_namelist(global::null_identifier);
+                }
+            } else {
+                try {
+                    $$ = identifier_check(global::last_identifier);
+                } catch (std::exception& e) {
+                    $$ = lua_things::Type::NIL;
+                }
+                add_namelist(global::last_identifier);
             }
         } else {
-            try {
-                $$ = identifier_check(global::last_identifier);
-            } catch (std::exception& e) {
-                $$ = lua_things::Type::NIL;
-            }
-            add_namelist(global::last_identifier);
+            $$ = lua_things::expression(lua_things::Type::TABLE);
         }
     }
-|   primary index  { TRY_INDEX($$, $1, $2);                       pop_namelist(); add_namelist(global::null_identifier); }
-|   var index      { TRY_INDEX($$, $1, $2);                       pop_namelist(); add_namelist(global::null_identifier); }
-|   call index     { TRY_INDEX($$, lua_things::Type::TABLE, $2);  pop_namelist(); add_namelist(global::null_identifier); }
+|   primary { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, $1, $2); pop_namelist(); add_namelist(global::null_identifier); }
+|   var     { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, $1, $2); pop_namelist(); add_namelist(global::null_identifier); }
+|   call    { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, lua_things::expression(lua_things::Type::TABLE), $2);  pop_namelist(); add_namelist(global::null_identifier); }
 ;
 
 index:
@@ -338,20 +345,20 @@ explist:
 exp:
     primary     %prec ";"  { $$ = $1; }
 |   var         %prec ";"  { $$ = $1; }
-|   call        %prec ";"
+|   call        %prec ";"  { $$ = $1; $$.is_return = true;}
 |   binop
 |   unop
 ;
 
 primary:
-    "nil"            { $$ = lua_things::Type::NIL; }
-|   "false"          { $$ = lua_things::Type::BOOL; }
-|   "true"           { $$ = lua_things::Type::BOOL; }
-|   numeral          { $$ = lua_things::Type::NUM; }
-|   STRINGCONST      { $$ = lua_things::Type::STR; }
-|   "..."            { $$ = lua_things::Type::TABLE; }
-|   functiondef      { $$ = lua_things::Type::FUNCTION; }
-|   tableconstructor { $$ = lua_things::Type::TABLE; }
+    "nil"            { $$ = lua_things::expression(lua_things::Type::NIL);      }
+|   "false"          { $$ = lua_things::expression(lua_things::Type::BOOL);     }
+|   "true"           { $$ = lua_things::expression(lua_things::Type::BOOL);     }
+|   numeral          { $$ = lua_things::expression(lua_things::Type::NUM);      }
+|   STRINGCONST      { $$ = lua_things::expression(lua_things::Type::STR);      }
+|   "..."            { $$ = lua_things::expression(lua_things::Type::TABLE);    }
+|   functiondef      { $$ = lua_things::expression(lua_things::Type::FUNCTION); }
+|   tableconstructor { $$ = lua_things::expression(lua_things::Type::TABLE);    }
 |   "(" exp ")"      { $$ = $2; }
 ;
 

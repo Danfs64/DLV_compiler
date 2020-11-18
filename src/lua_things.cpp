@@ -1,3 +1,4 @@
+#include "common_utils.hpp"
 #include "lua_things.hpp"
 
 const char* type_error_message = "Incompatible types.";
@@ -135,3 +136,30 @@ lua_things::Type lua_things::check_index(lua_things::Type t1, lua_things::Type t
         throw lua_things::type_error(type_error_message);
     }
 }
+
+#define o(func)                                                                                        \
+    lua_things::expression lua_things:: func (lua_things::expression t1, lua_things::expression t2) {  \
+        lt t = func (t1.type, t2.type);                                                                \
+        return expression(t);                                                                          \
+    }
+o(check_arithm)
+o(check_eq)
+o(check_neq)
+o(check_order)
+o(check_logical)
+o(check_bitwise)
+o(check_cat)
+o(check_index)
+#undef o
+
+#define o(func)                                                             \
+    lua_things::expression lua_things:: func (lua_things::expression t1) {  \
+        lt t = func (t1.type);                                              \
+        return expression(t);                                               \
+    }
+o(check_arithm)
+o(check_bitwise)
+o(check_not)
+o(check_len)
+o(check_call)
+#undef o
