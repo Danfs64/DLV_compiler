@@ -34,6 +34,7 @@ namespace global {
     extern const std::string null_identifier;
     extern bool is_args;
     extern bool is_index;
+    extern bool lock_list;
 }
 #endif // common_utils_hpp_INCLUDED
 

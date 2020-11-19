@@ -18,4 +18,5 @@ namespace global {
     const std::string null_identifier;
     bool is_args = false;
     bool is_index = false;
+    bool lock_list = false;
 }
