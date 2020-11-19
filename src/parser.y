@@ -73,6 +73,8 @@ data_structures::context ctx;
     #define STORE_LIST_TYPE()    { global::prev_assign_list_type = global::assign_list_type; }
     #define TO_EXPLIST()         { global::assign_list_type = list_type::EXPLIST; }
     #define RESTORE_LIST_TYPE()  { global::assign_list_type = global::prev_assign_list_type; }
+
+    #define CHECK_GOTO()   { if (!ctx.verify_goto_calls()) { error_goto(); } }
 }
 
 %token	IDENTIFIER STRINGCONST INTCONST FLOATCONST
@@ -207,7 +209,7 @@ loop_fields:
 // --- Rules
 
 chunk:
-    block
+    block  { CHECK_GOTO(); }
 ;
 
 block:
@@ -222,36 +224,44 @@ stat:
         #endif
         global::assign_list_type = list_type::EXPLIST;
     } explist {
+        ASSIGN_GLOBAL();
         ASSIGN_AND_CLEAR();
         global::assign_list_type = list_type::VARLIST;
     }
 |   call                            %prec ";"                    { CLEAR_NAME_EXP(); } 
 |   label
 |   "break" { if(!ctx.verify_break()) { error_break(); } }
-|   "goto" IDENTIFIER
+|   "goto" IDENTIFIER { ctx.add_goto_call(global::last_identifier); }
 |   "do" { NEW_SCOPE(NON_LOOP); } block "end" { REMOVE_SCOPE(); }
 |   "while" exp "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
 |   "repeat" { NEW_SCOPE(LOOP); } block "until" exp { REMOVE_SCOPE(); }
 |   "if" exp { CLEAR_NAME_EXP(); } "then" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); } loop_elseif opt_else "end" { CLEAR_NAME_EXP(); }
 |   "for" IDENTIFIER { global::for_init_id = global::last_identifier; } "=" exp "," exp opt_comma_exp "do" {
+        CLEAR_NAME_EXP();
         NEW_SCOPE(LOOP);
         #ifdef DLVCDEBUG
         std::cerr << "for_init_id: " << global::for_init_id << std::endl;
         #endif
         add_symbol_last_scope(global::for_init_id, yylineno, ($5).type);
     } block "end" { REMOVE_SCOPE(); }
-|   "for" namelist "in" explist "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
+|   "for" namelist "in" explist "do" {
+        NEW_SCOPE(LOOP);
+        ASSIGN_AND_CLEAR();
+        CLEAR_NAME_EXP();
+    } block "end" { REMOVE_SCOPE(); }
 |   "function" funcname {
         add_symbol_global_scope(global::full_funcname.at(0), yylineno, ($2).type);
         global::full_funcname.clear();
         ctx.new_scope(data_structures::scope_type::FUNCTION);
     } funcbody {
+        ctx.verify_goto_calls();
         ctx.remove_scope();
     }
 |   "local" "function" IDENTIFIER {
         add_symbol_last_scope(global::last_identifier, yylineno, lua_things::Type::FUNCTION);
         ctx.new_scope(data_structures::scope_type::FUNCTION);
     } funcbody {
+        ctx.verify_goto_calls();
         ctx.remove_scope();
     }
 |   "local" {
@@ -272,7 +282,7 @@ retstat:
     "return" opt_explist opt_semi
 
 label:
-    "::" IDENTIFIER { add_label(yytext); } "::"
+    "::" IDENTIFIER { add_label(yytext); ctx.add_goto_label(global::last_identifier); } "::"
 ;
 
 funcname:
@@ -288,6 +298,7 @@ var:
         #ifdef DLVCDEBUG
         std::cerr << "-------- Acessing identifier --------" << std::endl;
         std::cerr << "ID: " << global::last_identifier << std::endl;
+        std::cerr << "Is index: " << global::is_index << std::endl;
         switch (global::assign_list_type) {
             case list_type::VARLIST:
                 std::cerr << "LIST_TYPE: VARLIST" << std::endl;
@@ -300,7 +311,7 @@ var:
                 break;
         }
         #endif
-        if (global::is_index) {
+        if (!global::is_index) {
             if (global::assign_list_type == list_type::EXPLIST) {
                 try {
                     $$ = identifier_check(global::last_identifier);
@@ -322,14 +333,14 @@ var:
             $$ = lua_things::expression(lua_things::Type::TABLE);
         }
     }
-|   primary { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, $1, $2); pop_namelist(); add_namelist(global::null_identifier); }
-|   var     { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, $1, $2); pop_namelist(); add_namelist(global::null_identifier); }
+|   primary { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, $1, $2); }
+|   var     { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, $1, $2); }
 |   call    { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, lua_things::expression(lua_things::Type::TABLE), $2);  pop_namelist(); add_namelist(global::null_identifier); }
 ;
 
 index:
-    "[" exp "]"       { $$ = $2; }
-|   "." IDENTIFIER    { $$ = $2; }
+    "[" { global::lock_list = true; } exp { global::lock_list = false; } "]"       { $$ = $2; pop_namelist(); add_namelist(global::null_identifier); }
+|   "." IDENTIFIER    { $$ = $2; pop_namelist(); add_namelist(global::null_identifier); }
 ;
 
 namelist:
@@ -364,9 +375,9 @@ primary:
 
 call:
     primary args                   { TRY_CALL($$, $1); }
-|   primary ":" IDENTIFIER args    { TRY_CALL($$, $1); }
+|   primary ":" IDENTIFIER args    { TRY_INDEX($$, $1, luae(luat::STR)); }
 |   var args                       { TRY_CALL($$, $1); }
-|   var ":" IDENTIFIER args        { TRY_CALL($$, $1); }
+|   var ":" IDENTIFIER args        { TRY_INDEX($$, $1, luae(luat::STR)); }
 |   call args                      { TRY_CALL($$, $1); RESTORE_LIST_TYPE(); }
 |   call ":" IDENTIFIER args       { TRY_CALL($$, $1); }
 ;
