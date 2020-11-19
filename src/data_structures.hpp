@@ -82,6 +82,8 @@ namespace data_structures {
 
     struct context {
         std::vector<scope> scope_stack;
+        std::set<std::string> label_set;
+        std::set<std::string> call_set;
         bool is_in_assignment;
         // assign_type assignment_type;
         // std::vector<std::string> assign_names;
@@ -114,22 +116,38 @@ namespace data_structures {
         }
 
         bool verify_goto_calls() {
-            label_set all_labels;
-            label_set all_calls;
-            for (const auto& s : scope_stack) {
-                /* union of all labels sets */
-                all_labels.insert(std::begin(s.goto_labels), std::end(s.goto_labels));
-                all_calls.insert(std::begin(s.goto_calls), std::end(s.goto_calls));
-            }
+            #ifdef DLVCDEBUG
+                std::cerr << "----- verify_goto_calls ------ " << std::endl;
+            #endif
 
-            label_set difference;
+            // label_set all_labels;
+            // label_set all_calls;
+            // for (const auto& s : scope_stack) {
+            //     /* union of all labels sets */
+            //     all_labels.insert(std::begin(s.goto_labels), std::end(s.goto_labels));
+            //     all_calls.insert(std::begin(s.goto_calls), std::end(s.goto_calls));
+            // }
+
+            std::set<std::string> difference;
+            // std::set_difference(
+            //     std::begin(all_calls),
+            //     std::end(all_calls),
+            //     std::begin(all_labels),
+            //     std::end(all_labels),
+            //     std::inserter(difference, std::begin(difference))
+            // );
             std::set_difference(
-                std::begin(all_calls),
-                std::end(all_calls),
-                std::begin(all_labels),
-                std::end(all_labels),
+                std::begin(call_set),
+                std::end(call_set),
+                std::begin(label_set),
+                std::end(label_set),
                 std::inserter(difference, std::begin(difference))
             );
+
+            #ifdef DLVCDEBUG
+                std::cerr << difference.size() << std::endl;
+                std::cerr << "-------------------------------------------------" << std::endl;
+            #endif
             return difference.size() == 0;
         }
 
@@ -159,6 +177,14 @@ namespace data_structures {
             #ifdef DLVCDEBUG
                 std::cerr << "-------------------------------------------------" << std::endl;
             #endif
+        }
+
+        void add_goto_label(const std::string& label_name) {
+            label_set.emplace(label_name);
+        }
+
+        void add_goto_call(const std::string& label_name) {
+            call_set.emplace(label_name);
         }
     };
 };
