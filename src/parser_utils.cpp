@@ -5,6 +5,7 @@
 #include "common_utils.hpp"
 #include "lua_things.hpp"
 #include "data_structures.hpp"
+#include "error_messages.hpp"
 
 extern data_structures::context ctx;
 extern int yylineno;
@@ -12,7 +13,9 @@ extern int yylineno;
 void add_namelist(const std::string& name) {
     #ifdef DLVCDEBUG
     std::cerr << "----- add_namelist ------ " << yylineno << std::endl;
+    std::cerr << "Lock list: " << global::lock_list << std::endl;
     #endif
+    if (global::lock_list) return;
     if (global::assign_list_type != list_type::EXPLIST) {
         #ifdef DLVCDEBUG
         std::cerr << "~~~ " << name << std::endl;
@@ -30,9 +33,12 @@ void add_namelist(const std::string& name) {
 void pop_namelist() {
     #ifdef DLVCDEBUG
     std::cerr << "----- pop_namelist ------ " << yylineno << std::endl;
+    std::cerr << "Lock list: " << global::lock_list << std::endl;
     #endif
+    if (global::lock_list) return;
     if (global::namelist.size() > 0 &&
-        global::assign_type != data_structures::assign_type::LOCAL) {
+        /*global::assign_type != data_structures::assign_type::LOCAL*/
+        global::assign_list_type == list_type::VARLIST) {
         #ifdef DLVCDEBUG
         std::cerr << "POP" << std::endl;
         #endif
@@ -46,7 +52,9 @@ void pop_namelist() {
 void add_explist(lua_things::Type type) {
     #ifdef DLVCDEBUG
     std::cerr << "----- add_explist ------ " << yylineno << std::endl;
+    std::cerr << "Lock list: " << global::lock_list << std::endl;
     #endif
+    if (global::lock_list) return;
     if (global::assign_list_type == list_type::EXPLIST and !global::is_args) {
         #ifdef DLVCDEBUG
         std::cerr << "~~~ " << lua_things::type_string(type) << std::endl;
@@ -61,7 +69,9 @@ void add_explist(lua_things::Type type) {
 void add_explist(lua_things::expression type) {
     #ifdef DLVCDEBUG
     std::cerr << "----- add_explist ------ " << yylineno << std::endl;
+    std::cerr << "Lock list: " << global::lock_list << std::endl;
     #endif
+    if (global::lock_list) return;
     if (global::assign_list_type == list_type::EXPLIST and !global::is_args) {
         #ifdef DLVCDEBUG
         std::cerr << "~~~ " << lua_things::type_string(type.type) << std::endl;
@@ -76,7 +86,9 @@ void add_explist(lua_things::expression type) {
 void pop_explist() {
     #ifdef DLVCDEBUG
     std::cerr << "----- pop_explist ------ " << yylineno << std::endl;
+    std::cerr << "Lock list: " << global::lock_list << std::endl;
     #endif
+    if (global::lock_list) return;
     if (global::explist.size() > 0) {
         #ifdef DLVCDEBUG
         std::cerr << "POP" << std::endl;
@@ -132,15 +144,18 @@ void add_label(const char* label_name) {
 void add_assign_list() {
     #ifdef DLVCDEBUG
     std::cerr << "----- add_assign_list ------ " << yylineno << std::endl;
-    std::cerr << "Number of expressions: " << global::explist.size() << std::endl;
     std::cerr << "Number of variables/names: " << global::namelist.size() << std::endl;
+    std::cerr << "Number of expressions: " << global::explist.size() << std::endl;
     if (global::assign_type == data_structures::assign_type::LOCAL) {
         std::cerr << "LOCAL" << std::endl;
     } else {
         std::cerr << "GLOBAL" << std::endl;
     }
     #endif
-    if (global::explist.size() > 0 && global::namelist.size() != global::explist.size()) {
+    if ((global::explist.size() > 0) &&
+        ((global::namelist.size() < global::explist.size()) ||
+         (global::namelist.size() > global::explist.size() && !global::explist.back().is_return))
+       ) {
         /*
         TODO: verificar quando o último for uma chamada de função
         */
@@ -150,12 +165,11 @@ void add_assign_list() {
         }
         for (const auto& i : global::explist) {
             std::cerr << "§§§ " << lua_things::type_string(i.type) << std::endl;
+            std::cerr << "§§§ " << i.is_return << std::endl;
         }
         #endif
 
-        std::cerr << "Assignment list error(" << yylineno << "): number of variables "
-                        "doesn't match expressions\n";
-        exit(1);
+        assignment_list_error();
     }
 
     auto& scope = global::assign_type == data_structures::assign_type::LOCAL
@@ -166,15 +180,21 @@ void add_assign_list() {
             scope.table.add_var(i, yylineno, lua_things::Type::NIL);
         }
     } else {
-        for (size_t i = 0; i < global::namelist.size(); ++i) {
-            const auto& name = global::namelist[i];
-            const auto& exp_type = global::explist[i];
+        size_t i;
+        for (i = 0; i < global::explist.size(); ++i) {
+            const auto& name = global::namelist.at(i);
+            const auto& exp_type = global::explist.at(i);
 
             #ifdef DLVCDEBUG
             std::cerr << "+++ " << name << std::endl;
             std::cerr << "%%% " <<lua_things::type_string(exp_type.type) << std::endl;
             #endif
             scope.table.add_var(name, yylineno, exp_type.type);
+        }
+
+        for(; i < global::namelist.size(); ++i) {
+            const auto& name = global::namelist.at(i);
+            scope.table.add_var(name, yylineno, lua_things::Type::TABLE);
         }
     }
 
