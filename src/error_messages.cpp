@@ -71,3 +71,17 @@ void error_identifier_dont_exist(const std::string& id) {
     std::cerr << error_message.get();
     std::exit(7);
 }
+
+void error_goto() {
+    print_semerror_start();
+    const char* message_template = "Some goto call(s) dont match a label";
+    std::cerr << message_template << std::endl;
+    std::exit(8);
+}
+
+void assignment_list_error() {
+    print_semerror_start();
+    std::cerr << "Number of variables does not match expressions and last expression isn't a"
+                " function call." << std::endl;
+    std::exit(9);
+}
