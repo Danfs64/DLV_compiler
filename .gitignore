@@ -1,5 +1,8 @@
+**/.ccls-cache
+**/.ccls
+.vscode
 dlvc
-src/parser.hpp
+src/scanner.cc
 src/parser.cc
 src/parser.output
-src/scanner.cc
+src/parser.hpp

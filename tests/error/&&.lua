@@ -1,1 +1,0 @@
-ans = aBoolValue && 'yes' or 'no'

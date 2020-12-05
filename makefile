@@ -1,4 +1,7 @@
 
 all:
 	+$(MAKE) -C src
-	mv src/a.out ./dlvc
+	mv src/dlvc ./dlvc
+
+clean:
+	+$(MAKE) -C src clean
