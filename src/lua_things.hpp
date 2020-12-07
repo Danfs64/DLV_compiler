@@ -42,6 +42,7 @@ namespace lua_things {
         
         expression(lua_things::Type type)
         : type(type), is_named(false), name(""), is_return(false)  {}
+
     };
 
     inline const char* type_string(Type t) {

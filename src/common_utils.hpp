@@ -5,6 +5,7 @@
 #include <vector>
 #include "data_structures.hpp"
 #include "lua_things.hpp"
+#include "ast.hpp"
 
 enum class var_type : int {
     NAME,
@@ -35,6 +36,7 @@ namespace global {
     extern bool is_args;
     extern bool is_index;
     extern bool lock_list;
+    extern node root;
 }
 #endif // common_utils_hpp_INCLUDED
 

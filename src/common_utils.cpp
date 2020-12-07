@@ -3,7 +3,7 @@
 #include "data_structures.hpp"
 #include "lua_things.hpp"
 #include "common_utils.hpp"
-
+#include "ast.hpp"
 
 namespace global {
     std::vector<std::string> namelist;
@@ -19,4 +19,5 @@ namespace global {
     bool is_args = false;
     bool is_index = false;
     bool lock_list = false;
+    node root(NodeKind::program, lua_things::expression());
 }

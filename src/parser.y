@@ -21,8 +21,9 @@
 #include "error_messages.hpp"
 #include "common_utils.hpp"
 #include "parser_utils.hpp"
+#include "ast.hpp"
 
-#define YYSTYPE lua_things::expression
+#define YYSTYPE node
 
 using luat = lua_things::Type;
 using luae = lua_things::expression;
@@ -36,12 +37,13 @@ extern int yylineno;
 extern int yy_flex_debug;
 
 data_structures::context ctx;
+node root(NodeKind::program, luae());
 
 }
 
 %code {
     /* Utility macros and functions */
-    #define TRY_OP(bop, vf, v1, v2, func)  { try { vf = func(v1, v2); } catch (std::exception& e) { std::cout << e.what();  error_binop( bop , (v1).type, (v2).type); } }
+    #define TRY_OP(bop, vf, v1, v2, func)  { try { vf.expr = func(v1.expr, v2.expr); } catch (std::exception& e) { std::cout << e.what();  error_binop( bop , (v1).expr.type, (v2).expr.type); } }
 
     #define TRY_ARITHM(bop, vf, v1, v2)  TRY_OP(bop, vf, v1, v2, lua_things::check_arithm)
     #define TRY_EQ(bop, vf, v1, v2)      TRY_OP(bop, vf, v1, v2, lua_things::check_eq)
@@ -51,16 +53,16 @@ data_structures::context ctx;
     #define TRY_LOGICAL(bop, vf, v1, v2) TRY_OP(bop, vf, v1, v2, lua_things::check_logical)
     #define TRY_BITWISE(bop, vf, v1, v2) TRY_OP(bop, vf, v1, v2, lua_things::check_bitwise)
 
-    #define TRY_UOP(uop, vf, v, func) { try { vf = func(v); } catch (std::exception& e) { error_unop(uop , (v).type); } }
+    #define TRY_UOP(uop, vf, v, func) { try { vf.expr = func(v.expr); } catch (std::exception& e) { error_unop(uop , v.expr.type); } }
 
     #define TRY_UARITHM(uop, vf, v)   TRY_UOP(uop, vf, v, lua_things::check_arithm)
     #define TRY_UBITWISE(uop, vf, v)  TRY_UOP(uop, vf, v, lua_things::check_bitwise)
     #define TRY_NOT(uop, vf, v)       TRY_UOP(uop, vf, v, lua_things::check_not)
     #define TRY_LEN(uop, vf, v)       TRY_UOP(uop, vf, v, lua_things::check_len)
 
-    #define TRY_CALL(vf, v)  { try { vf = lua_things::check_call(v); } catch (std::exception& e) { error_call((v).type); } }
+    #define TRY_CALL(vf, v)  { try { vf.expr = lua_things::check_call(v.expr); } catch (std::exception& e) { error_call(v.expr.type); } }
 
-    #define TRY_INDEX(vf, v1, v2)  { try { vf = lua_things::check_index(v1, v2); } catch (std::exception& e) { error_index((v1).type, (v2).type); } }
+    #define TRY_INDEX(vf, v1, v2)  { try { vf.expr = lua_things::check_index(v1.expr, v2.expr); } catch (std::exception& e) { error_index((v1).expr.type, (v2).expr.type); } }
 
     #define ASSIGN_LOCAL()       { global::assign_type = data_structures::assign_type::LOCAL;            }
     #define ASSIGN_GLOBAL()      { global::assign_type = data_structures::assign_type::GLOBAL;           }
@@ -75,6 +77,17 @@ data_structures::context ctx;
     #define RESTORE_LIST_TYPE()  { global::assign_list_type = global::prev_assign_list_type; }
 
     #define CHECK_GOTO()   { if (!ctx.verify_goto_calls()) { error_goto(); } }
+
+    void unify_binop_nodes(node& parent, node&& child1, node&& child2, const char* opstr) {
+        parent.add_child(std::move(child1));
+        parent.add_child(std::move(child2));
+        parent.kind = str2kind(opstr);
+    }
+
+    void unify_uop_nodes(node& parent, node&& child, const char* opstr) {
+        parent.add_child(std::move(child));
+        parent.kind = str2kind(opstr);
+    }
 }
 
 %token	IDENTIFIER STRINGCONST INTCONST FLOATCONST
@@ -126,7 +139,7 @@ numeral:
 
 opt_retstat:
     %empty
-|   retstat
+|   retstat  { $$ = std::move($1); }
 ;
 
 opt_semi:
@@ -187,8 +200,8 @@ opt_fieldsep:
 // --- Loop
 
 loop_stat:
-    %empty
-|   loop_stat stat
+    %empty         { /* Move nothing */; }
+|   loop_stat stat { $1.add_child(std::move($2)); $$ = std::move($1);  }
 ;
 
 loop_elseif:
@@ -209,11 +222,11 @@ loop_fields:
 // --- Rules
 
 chunk:
-    block  { CHECK_GOTO(); }
+    block  { CHECK_GOTO(); root = std::move($1); root.kind = NodeKind::program; }
 ;
 
 block:
-    loop_stat opt_retstat
+    loop_stat opt_retstat { $1.add_child(std::move($2)); $$ = std::move($1); }
 ;
 
 stat:
@@ -227,6 +240,10 @@ stat:
         ASSIGN_GLOBAL();
         ASSIGN_AND_CLEAR();
         global::assign_list_type = list_type::VARLIST;
+
+        $$.add_child(std::move($1));
+        $$.add_child(std::move($4));
+        $$.kind = NodeKind::assign;
     }
 |   call                            %prec ";"                    { CLEAR_NAME_EXP(); } 
 |   label
@@ -242,7 +259,7 @@ stat:
         #ifdef DLVCDEBUG
         std::cerr << "for_init_id: " << global::for_init_id << std::endl;
         #endif
-        add_symbol_last_scope(global::for_init_id, yylineno, ($5).type);
+        add_symbol_last_scope(global::for_init_id, yylineno, ($5).expr.type);
     } block "end" { REMOVE_SCOPE(); }
 |   "for" namelist "in" explist "do" {
         NEW_SCOPE(LOOP);
@@ -250,7 +267,7 @@ stat:
         CLEAR_NAME_EXP();
     } block "end" { REMOVE_SCOPE(); }
 |   "function" funcname {
-        add_symbol_global_scope(global::full_funcname.at(0), yylineno, ($2).type);
+        add_symbol_global_scope(global::full_funcname.at(0), yylineno, ($2).expr.type);
         global::full_funcname.clear();
         ctx.new_scope(data_structures::scope_type::FUNCTION);
     } funcbody {
@@ -268,6 +285,17 @@ stat:
         ASSIGN_LOCAL();
     }  namelist {
         global::assign_list_type = list_type::EXPLIST;
+
+        // AST
+        // Fix node list
+        auto tmp = std::move($3);
+        auto tmp_list = std::move(tmp.children);
+        $3 = node();
+        $3.add_child(std::move(tmp));
+        for (auto& i : tmp_list) {
+            $3.add_child(std::move(i));
+        }
+        $3.kind = NodeKind::var_list;
     } opt_eq_explist {
         ASSIGN_AND_CLEAR();
         #ifdef DLVCDEBUG
@@ -275,6 +303,10 @@ stat:
         #endif
         ASSIGN_GLOBAL();
         global::assign_list_type = list_type::VARLIST;
+
+        // AST
+        $$.kind = NodeKind::var_decl;
+        $$.add_child(std::move($3));
     }
 ;
 
@@ -286,12 +318,14 @@ label:
 ;
 
 funcname:
-    IDENTIFIER { global::full_funcname.emplace_back(global::last_identifier); } loop_dot_name opt_col_name  { $$ = add_func(); }
+    IDENTIFIER { global::full_funcname.emplace_back(global::last_identifier); } loop_dot_name opt_col_name  {
+        $$.expr = add_func();
+    }
 ;
 
 varlist:
-    var
-|   varlist "," var
+    var              { $$ = std::move($1); $$.kind = NodeKind::var_use; }
+|   varlist "," var  { $1.add_child(std::move($3)); $$ = std::move($1); $$.kind = NodeKind::var_list; }
 
 var:
     IDENTIFIER {
@@ -314,7 +348,8 @@ var:
         if (!global::is_index) {
             if (global::assign_list_type == list_type::EXPLIST) {
                 try {
-                    $$ = identifier_check(global::last_identifier);
+                    auto expr = identifier_check(global::last_identifier);
+                    $$ = node(NodeKind::var_use, expr);
                     if (global::assign_type != data_structures::assign_type::LOCAL)
                         add_namelist(global::last_identifier);
                 } catch (std::exception& e) {
@@ -323,19 +358,28 @@ var:
                 }
             } else {
                 try {
-                    $$ = identifier_check(global::last_identifier);
+                    auto expr = identifier_check(global::last_identifier);
+                    $$ = node(NodeKind::var_use, expr);
                 } catch (std::exception& e) {
-                    $$ = lua_things::Type::NIL;
+                    $$ = node(NodeKind::var_use, lua_things::Type::NIL);
                 }
                 add_namelist(global::last_identifier);
             }
+            $$.expr.name = global::last_identifier;
         } else {
-            $$ = lua_things::expression(lua_things::Type::TABLE);
+            auto expr = lua_things::expression(lua_things::Type::TABLE);
+            $$ = node(NodeKind::var_use, expr);
         }
     }
 |   primary { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, $1, $2); }
 |   var     { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, $1, $2); }
-|   call    { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, lua_things::expression(lua_things::Type::TABLE), $2);  pop_namelist(); add_namelist(global::null_identifier); }
+|   call    { global::is_index = true; } index {
+        global::is_index = false;
+        auto return_node = node(NodeKind::table, luae(luat::TABLE));
+        TRY_INDEX($$, return_node, $2); 
+        pop_namelist();
+        add_namelist(global::null_identifier);
+    }
 ;
 
 index:
@@ -344,40 +388,63 @@ index:
 ;
 
 namelist:
-    IDENTIFIER                 { add_namelist(global::last_identifier); }
-|   namelist "," IDENTIFIER    { add_namelist(global::last_identifier); }
+    IDENTIFIER                 {
+        add_namelist(global::last_identifier);
+        // AST
+        auto expr = luae();
+        expr.name = global::last_identifier;
+        $$ = node(NodeKind::var_name, expr);
+        $$.kind = NodeKind::var_name;
+    }
+|   namelist "," IDENTIFIER    {
+        add_namelist(global::last_identifier);
+        // AST
+        luae expr;
+        expr.name = global::last_identifier;
+        node new_node = node(NodeKind::var_name, expr);
+        $1.add_child(std::move(new_node));
+        $$ = std::move($1);
+    }
 ;
 
 explist:
-    exp                   { add_explist($1); }
-|   explist "," exp       { add_explist($3); }
+    exp                   { add_explist($1.expr); $$ = std::move($1); }
+|   explist "," exp       { add_explist($3.expr); $1.add_child(std::move($3)); $$ = std::move($1); }
 ;
 
 exp:
-    primary     %prec ";"  { $$ = $1; }
-|   var         %prec ";"  { $$ = $1; }
-|   call        %prec ";"  { $$ = $1; $$.is_return = true;}
-|   binop
-|   unop
+    primary     %prec ";"  { $$ = std::move($1); }
+|   var         %prec ";"  { $$ = std::move($1); }
+|   call        %prec ";"  { $$ = std::move($1); $$.expr.is_return = true;}
+|   binop                  { $$ = std::move($1); }
+|   unop                   { $$ = std::move($1); }
 ;
 
 primary:
-    "nil"            { $$ = lua_things::expression(lua_things::Type::NIL);      }
-|   "false"          { $$ = lua_things::expression(lua_things::Type::BOOL);     }
-|   "true"           { $$ = lua_things::expression(lua_things::Type::BOOL);     }
-|   numeral          { $$ = lua_things::expression(lua_things::Type::NUM);      }
-|   STRINGCONST      { $$ = lua_things::expression(lua_things::Type::STR);      }
-|   "..."            { $$ = lua_things::expression(lua_things::Type::TABLE);    }
-|   functiondef      { $$ = lua_things::expression(lua_things::Type::FUNCTION); }
-|   tableconstructor { $$ = lua_things::expression(lua_things::Type::TABLE);    }
+    "nil"            { $$ = node(NodeKind::nil_val,  luae(lua_things::Type::NIL));      }
+|   "false"          { $$ = node(NodeKind::bool_val, luae(lua_things::Type::BOOL));     }
+|   "true"           { $$ = node(NodeKind::bool_val, luae(lua_things::Type::BOOL));     }
+|   numeral          { $$ = node(NodeKind::num_val,  luae(lua_things::Type::NUM));      }
+|   STRINGCONST      { $$ = node(NodeKind::str_val,  luae(lua_things::Type::STR));      }
+|   "..."            { $$ = node(NodeKind::table,    luae(lua_things::Type::TABLE));    }
+|   functiondef      { $$ = node(NodeKind::func_def, luae(lua_things::Type::FUNCTION)); }
+|   tableconstructor { $$ = node(NodeKind::table,    luae(lua_things::Type::TABLE));    }
 |   "(" exp ")"      { $$ = $2; }
 ;
 
 call:
-    primary args                   { TRY_CALL($$, $1); }
-|   primary ":" IDENTIFIER args    { TRY_INDEX($$, $1, luae(luat::STR)); }
-|   var args                       { TRY_CALL($$, $1); }
-|   var ":" IDENTIFIER args        { TRY_INDEX($$, $1, luae(luat::STR)); }
+    primary args                   { TRY_CALL($$, $1); $$.add_child(std::move($2)); $$.kind = NodeKind::call; }
+|   primary ":" IDENTIFIER args    {
+        auto call_node = node(NodeKind::index, luae(luat::STR));
+        TRY_INDEX($$, $1, call_node);
+        $$.kind = NodeKind::index;
+    }
+|   var args                       { TRY_CALL($$, $1); $$.add_child(std::move($2)); $$.kind = NodeKind::call; }
+|   var ":" IDENTIFIER args        {
+        auto call_node = node(NodeKind::index, luae(luat::STR));
+        TRY_INDEX($$, $1, call_node);
+        $$.kind = NodeKind::index;
+    }
 |   call args                      { TRY_CALL($$, $1); RESTORE_LIST_TYPE(); }
 |   call ":" IDENTIFIER args       { TRY_CALL($$, $1); }
 ;
@@ -421,34 +488,34 @@ fieldsep:
 ;
 
 binop:
-    exp "+"   exp { TRY_ARITHM("+", $$, $1, $3);    }
-|   exp "-"   exp { TRY_ARITHM("-", $$, $1, $3);    }
-|   exp "*"   exp { TRY_ARITHM("*", $$, $1, $3);    }
-|   exp "/"   exp { TRY_ARITHM("/", $$, $1, $3);    }
-|   exp "//"  exp { TRY_ARITHM("/", $$, $1, $3);    }
-|   exp "^"   exp { TRY_ARITHM("^", $$, $1, $3);    }
-|   exp "%"   exp { TRY_ARITHM("%", $$, $1, $3);    }
-|   exp "&"   exp { TRY_BITWISE("&", $$, $1, $3);   }
-|   exp "~"   exp { TRY_BITWISE("~", $$, $1, $3);   }
-|   exp "|"   exp { TRY_BITWISE("|", $$, $1, $3);   }
-|   exp ">>"  exp { TRY_BITWISE(">>", $$, $1, $3);  }
-|   exp "<<"  exp { TRY_BITWISE("<<", $$, $1, $3);  }
-|   exp ".."  exp { TRY_CAT("..", $$, $1, $3);      }
-|   exp "<"   exp { TRY_ORDER("<", $$, $1, $3);     }
-|   exp "<="  exp { TRY_ORDER("<=", $$, $1, $3);    }
-|   exp ">"   exp { TRY_ORDER(">", $$, $1, $3);     }
-|   exp ">="  exp { TRY_ORDER(">=", $$, $1, $3);    }
-|   exp "=="  exp { TRY_EQ("==", $$, $1, $3);       }
-|   exp "~="  exp { TRY_NEQ("~=", $$, $1, $3);      }
-|   exp "and" exp { TRY_LOGICAL("and", $$, $1, $3); }
-|   exp "or"  exp { TRY_LOGICAL("or", $$, $1, $3);  }
+    exp "+"   exp { TRY_ARITHM("+", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "+"); }
+|   exp "-"   exp { TRY_ARITHM("-", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "-"); }
+|   exp "*"   exp { TRY_ARITHM("*", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "*"); }
+|   exp "/"   exp { TRY_ARITHM("/", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "/"); }
+|   exp "//"  exp { TRY_ARITHM("/", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "//"); }
+|   exp "^"   exp { TRY_ARITHM("^", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "^"); }
+|   exp "%"   exp { TRY_ARITHM("%", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "%"); }
+|   exp "&"   exp { TRY_BITWISE("&", $$, $1, $3);   unify_binop_nodes($$, std::move($1), std::move($3), "&"); }
+|   exp "~"   exp { TRY_BITWISE("~", $$, $1, $3);   unify_binop_nodes($$, std::move($1), std::move($3), "~"); }
+|   exp "|"   exp { TRY_BITWISE("|", $$, $1, $3);   unify_binop_nodes($$, std::move($1), std::move($3), "|"); }
+|   exp ">>"  exp { TRY_BITWISE(">>", $$, $1, $3);  unify_binop_nodes($$, std::move($1), std::move($3), ">>"); }
+|   exp "<<"  exp { TRY_BITWISE("<<", $$, $1, $3);  unify_binop_nodes($$, std::move($1), std::move($3), "<<"); }
+|   exp ".."  exp { TRY_CAT("..", $$, $1, $3);      unify_binop_nodes($$, std::move($1), std::move($3), ".."); }
+|   exp "<"   exp { TRY_ORDER("<", $$, $1, $3);     unify_binop_nodes($$, std::move($1), std::move($3), "<"); }
+|   exp "<="  exp { TRY_ORDER("<=", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "<="); }
+|   exp ">"   exp { TRY_ORDER(">", $$, $1, $3);     unify_binop_nodes($$, std::move($1), std::move($3), ">"); }
+|   exp ">="  exp { TRY_ORDER(">=", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), ">="); }
+|   exp "=="  exp { TRY_EQ("==", $$, $1, $3);       unify_binop_nodes($$, std::move($1), std::move($3), "=="); }
+|   exp "~="  exp { TRY_NEQ("~=", $$, $1, $3);      unify_binop_nodes($$, std::move($1), std::move($3), "~="); }
+|   exp "and" exp { TRY_LOGICAL("and", $$, $1, $3); unify_binop_nodes($$, std::move($1), std::move($3), "and"); }
+|   exp "or"  exp { TRY_LOGICAL("or", $$, $1, $3);  unify_binop_nodes($$, std::move($1), std::move($3), "or"); }
 ;
 
 unop:
-    "-"   exp     %prec "not" { TRY_UARITHM("-", $$, $2);  }
-|   "not" exp                 { TRY_NOT("not", $$, $2);    }
-|   "#"   exp                 { TRY_LEN("#", $$, $2);      }
-|   "~"   exp     %prec "not" { TRY_UBITWISE("~", $$, $2); }
+    "-"   exp     %prec "not" { TRY_UARITHM("-", $$, $2);  unify_uop_nodes($$, std::move($2), "-"); }
+|   "not" exp                 { TRY_NOT("not", $$, $2);    unify_uop_nodes($$, std::move($2), "not"); }
+|   "#"   exp                 { TRY_LEN("#", $$, $2);      unify_uop_nodes($$, std::move($2), "#"); }
+|   "~"   exp     %prec "not" { TRY_UBITWISE("~", $$, $2); unify_uop_nodes($$, std::move($2), "~"); }
 ;
 
 %%
@@ -474,5 +541,7 @@ int main(void) {
         puts("PARSE FAILED");
         return 1;
     }
+
+    root.print_dot();
     return 0;
 }
