@@ -138,7 +138,7 @@ numeral:
 // --- Opt
 
 opt_retstat:
-    %empty
+    %empty   { $$ = node(); }
 |   retstat  { $$ = std::move($1); }
 ;
 
@@ -201,7 +201,7 @@ opt_fieldsep:
 
 loop_stat:
     %empty         { /* Move nothing */; }
-|   loop_stat stat { $1.add_child(std::move($2)); $$ = std::move($1);  }
+|   loop_stat stat { $1.add_child(std::move($2)); $$ = std::move($1);}
 ;
 
 loop_elseif:
@@ -215,7 +215,7 @@ loop_dot_name:
 ;
 
 loop_fields:
-    %empty
+    %empty  { $$ = node(); }
 |   loop_fields fieldsep field
 ;
 

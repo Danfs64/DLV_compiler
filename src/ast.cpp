@@ -14,7 +14,8 @@
 using Type = lua_things::expression;
 
 void node::add_child(node&& child) {
-    children.push_back(child);
+    if (child.kind != NodeKind::NO_KIND)
+        children.push_back(child);
 }
 
 node& node::get_child(int idx) {
@@ -114,7 +115,7 @@ NodeKind str2kind(const char* kindstr) {
         {"~",        NodeKind::bnot},
         {"",         NodeKind::bool_val},
         {"|",        NodeKind::bor},
-        {"(...)",       NodeKind::call},
+        {"(...)",    NodeKind::call},
         {"..",       NodeKind::cat},
         {"==",       NodeKind::eq},
         {"",         NodeKind::exp_list},

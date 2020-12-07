@@ -52,6 +52,7 @@ enum class NodeKind : int {
     var_list,
     var_use,
     while_,
+    NO_KIND,  // Special kind for %empty rules
 
     // Todas as conversões são em tempo de execução
     // B2I_NODE,   // Conversion of types.
@@ -74,7 +75,7 @@ struct node {
     int print_node_dot();
     void print_dot();
 // public:
-    node() = default;
+    node() : kind(NodeKind::NO_KIND) {};
     node(NodeKind kind, lua_things::expression expr)
         : kind(kind), expr(expr) {}
 
