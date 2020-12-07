@@ -63,7 +63,7 @@ const char* kind2str(NodeKind kind) {
         case NodeKind::call:      return "(...)";
         case NodeKind::cat:       return "..";
         case NodeKind::eq:        return "==";
-        case NodeKind::exp_list:  return "";
+        case NodeKind::exp_list:  return "exp_list";
         case NodeKind::func_def:  return "function";
         case NodeKind::ge:        return ">=";
         case NodeKind::gt:        return ">";
@@ -79,7 +79,7 @@ const char* kind2str(NodeKind kind) {
         case NodeKind::neq:       return "~=";
         case NodeKind::nil_val:   return "nil";
         case NodeKind::not_:      return "not";
-        case NodeKind::num_val:   return "";
+        case NodeKind::num_val:   return "num_val";
         case NodeKind::or_:       return "or";
         case NodeKind::over:      return "/";
         case NodeKind::plus:      return "+";
@@ -220,13 +220,20 @@ int node::print_node_dot() {
     }
     */
 
-    if (kind == NodeKind::var_use or kind == NodeKind::var_name) {
-        char label_str[100];
-        std::string name_str = kindstr;
-        name_str += "@" + expr.name;
-        std::fprintf(stderr, label_template, my_nr, name_str.c_str());
-    } else {
-        std::fprintf(stderr, label_template, my_nr, kindstr);
+    std::string name_str = kindstr;
+    switch (kind) {
+        case NodeKind::var_use:
+        case NodeKind::var_name:
+            char label_str[100];
+            name_str += "@" + expr.name;
+            std::fprintf(stderr, label_template, my_nr, name_str.c_str());
+            break;
+        case NodeKind::num_val:
+            name_str += "@" + std::to_string(d_data);
+            std::fprintf(stderr, label_template, my_nr, name_str.c_str());
+            break;
+        default:
+            std::fprintf(stderr, label_template, my_nr, kindstr);
     }
     for (auto& i : this->children) {
         int child_nr = i.print_node_dot();

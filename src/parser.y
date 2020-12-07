@@ -132,8 +132,8 @@ node root(NodeKind::program, luae());
 // --- Helpers rules
 
 numeral:
-    INTCONST
-|   FLOATCONST
+    INTCONST      { double val = std::stod(yytext); $$.kind = NodeKind::num_val; $$.d_data = val;}
+|   FLOATCONST    { double val = std::stod(yytext); $$.kind = NodeKind::num_val; $$.d_data = val;}
 ;
 
 // --- Opt
@@ -169,8 +169,8 @@ opt_parlist:
 ;
 
 opt_eq_explist:
-    %empty
-|   "=" explist
+    %empty        { $$ = node();  }
+|   "=" explist   { $$ = std::move($2); }
 ;
 
 opt_explist:
@@ -308,6 +308,19 @@ stat:
         // AST
         $$.kind = NodeKind::var_decl;
         $$.add_child(std::move($3));
+        if ($5.kind != NodeKind::NO_KIND) {
+            //Fix explist
+            // auto tmp = std::move($5);
+            // auto tmp_list = std::move(tmp.children.back());
+            // $5 = node();
+            // $5.add_child(std::move(tmp));
+            // for (auto& i : tmp_list) {
+            //     $5.add_child(std::move(i));
+            // }
+            // $5.kind = NodeKind::exp_list;
+            std::cout << $5.children.size() << std::endl;
+            $$.add_child(std::move($5));
+        }
     }
 ;
 
@@ -409,8 +422,8 @@ namelist:
 ;
 
 explist:
-    exp                   { add_explist($1.expr); $$ = std::move($1); }
-|   explist "," exp       { add_explist($3.expr); $1.add_child(std::move($3)); $$ = std::move($1); }
+    exp                   { add_explist($1.expr); /* AST */ $$ = node(); $$.kind = NodeKind::exp_list; $$.add_child(std::move($1)); }
+|   explist "," exp       { add_explist($3.expr); /* AST */ $1.add_child(std::move($3)); $$ = std::move($1); }
 ;
 
 exp:
@@ -425,7 +438,7 @@ primary:
     "nil"            { $$ = node(NodeKind::nil_val,  luae(lua_things::Type::NIL));      }
 |   "false"          { $$ = node(NodeKind::bool_val, luae(lua_things::Type::BOOL));     }
 |   "true"           { $$ = node(NodeKind::bool_val, luae(lua_things::Type::BOOL));     }
-|   numeral          { $$ = node(NodeKind::num_val,  luae(lua_things::Type::NUM));      }
+|   numeral          { $$ = node(NodeKind::num_val,  luae(lua_things::Type::NUM)); $$.d_data = $1.d_data;      }
 |   STRINGCONST      { $$ = node(NodeKind::str_val,  luae(lua_things::Type::STR));      }
 |   "..."            { $$ = node(NodeKind::table,    luae(lua_things::Type::TABLE));    }
 |   functiondef      { $$ = node(NodeKind::func_def, luae(lua_things::Type::FUNCTION)); }

@@ -70,6 +70,7 @@ struct node {
     lua_things::expression expr;
     std::vector<node> children;
     float f_data;
+    double d_data;
     int   i_data;
 
     int print_node_dot();
