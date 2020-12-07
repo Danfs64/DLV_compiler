@@ -2,7 +2,7 @@ CC = g++
 CFLAGS = -std=c++17 -O0
 
 OBJECTS = obj/parser.o obj/scanner.o obj/error_messages.o obj/lua_things.o \
-          obj/common_utils.o obj/parser_utils.o obj/ast.o
+          obj/common_utils.o obj/parser_utils.o obj/ast.o obj/code.o
 
 .PHONY: MKDIR clean
 
@@ -33,6 +33,9 @@ obj/parser_utils.o: parser_utils.cpp
 	$(CC) $(CFLAGS) $(USER_DEFINES) -c $^ -o $@
 
 obj/ast.o: ast.cpp
+	$(CC) $(CFLAGS) $(USER_DEFINES) -c $^ -o $@
+
+obj/code.o: code.cpp
 	$(CC) $(CFLAGS) $(USER_DEFINES) -c $^ -o $@
 
 scanner.cc: scanner.l

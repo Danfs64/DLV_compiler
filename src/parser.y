@@ -22,6 +22,7 @@
 #include "common_utils.hpp"
 #include "parser_utils.hpp"
 #include "ast.hpp"
+#include "code.hpp"
 
 #define YYSTYPE node
 
@@ -543,5 +544,6 @@ int main(void) {
     }
 
     root.print_dot();
+    generate_code(root);
     return 0;
 }
