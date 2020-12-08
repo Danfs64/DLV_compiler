@@ -1,0 +1,19 @@
+<project name="simple char" basedir="." default="main" >
+  <target name="clean">
+    <delete dir="bin"/>
+    <delete dir="jar"/>
+  </target>
+
+  <target name="compile">
+    <mkdir dir="dlvc_bin"/>
+    <javac encoding="UTF-8" debug="true" target="1.8" srcdir="dlvc_classes" destdir="dlvc_bin"/>
+  </target>
+
+  <target name="jar" depends="compile">
+    <jar destfile="dlvc_jar.jar" basedir="dlvc_bin">
+    </jar>
+  </target>
+
+  <target name="run" depends="jar"/>
+  <target name="main" depends="run"/>
+</project>

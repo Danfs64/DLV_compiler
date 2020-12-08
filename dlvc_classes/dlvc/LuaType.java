@@ -1,0 +1,4 @@
+package dlvc;
+
+interface LuaType {
+}
