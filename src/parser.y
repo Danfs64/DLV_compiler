@@ -318,7 +318,7 @@ stat:
             //     $5.add_child(std::move(i));
             // }
             // $5.kind = NodeKind::exp_list;
-            std::cout << $5.children.size() << std::endl;
+            // std::cout << $5.children.size() << std::endl;
             $$.add_child(std::move($5));
         }
     }
@@ -502,27 +502,27 @@ fieldsep:
 ;
 
 binop:
-    exp "+"   exp { TRY_ARITHM("+", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "+"); }
-|   exp "-"   exp { TRY_ARITHM("-", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "-"); }
-|   exp "*"   exp { TRY_ARITHM("*", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "*"); }
-|   exp "/"   exp { TRY_ARITHM("/", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "/"); }
-|   exp "//"  exp { TRY_ARITHM("/", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "//"); }
-|   exp "^"   exp { TRY_ARITHM("^", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "^"); }
-|   exp "%"   exp { TRY_ARITHM("%", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "%"); }
-|   exp "&"   exp { TRY_BITWISE("&", $$, $1, $3);   unify_binop_nodes($$, std::move($1), std::move($3), "&"); }
-|   exp "~"   exp { TRY_BITWISE("~", $$, $1, $3);   unify_binop_nodes($$, std::move($1), std::move($3), "~"); }
-|   exp "|"   exp { TRY_BITWISE("|", $$, $1, $3);   unify_binop_nodes($$, std::move($1), std::move($3), "|"); }
-|   exp ">>"  exp { TRY_BITWISE(">>", $$, $1, $3);  unify_binop_nodes($$, std::move($1), std::move($3), ">>"); }
-|   exp "<<"  exp { TRY_BITWISE("<<", $$, $1, $3);  unify_binop_nodes($$, std::move($1), std::move($3), "<<"); }
-|   exp ".."  exp { TRY_CAT("..", $$, $1, $3);      unify_binop_nodes($$, std::move($1), std::move($3), ".."); }
-|   exp "<"   exp { TRY_ORDER("<", $$, $1, $3);     unify_binop_nodes($$, std::move($1), std::move($3), "<"); }
-|   exp "<="  exp { TRY_ORDER("<=", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "<="); }
-|   exp ">"   exp { TRY_ORDER(">", $$, $1, $3);     unify_binop_nodes($$, std::move($1), std::move($3), ">"); }
-|   exp ">="  exp { TRY_ORDER(">=", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), ">="); }
-|   exp "=="  exp { TRY_EQ("==", $$, $1, $3);       unify_binop_nodes($$, std::move($1), std::move($3), "=="); }
-|   exp "~="  exp { TRY_NEQ("~=", $$, $1, $3);      unify_binop_nodes($$, std::move($1), std::move($3), "~="); }
-|   exp "and" exp { TRY_LOGICAL("and", $$, $1, $3); unify_binop_nodes($$, std::move($1), std::move($3), "and"); }
-|   exp "or"  exp { TRY_LOGICAL("or", $$, $1, $3);  unify_binop_nodes($$, std::move($1), std::move($3), "or"); }
+    exp "+"   exp { $$ = node(); TRY_ARITHM("+", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "+"); }
+|   exp "-"   exp { $$ = node(); TRY_ARITHM("-", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "-"); }
+|   exp "*"   exp { $$ = node(); TRY_ARITHM("*", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "*"); }
+|   exp "/"   exp { $$ = node(); TRY_ARITHM("/", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "/"); }
+|   exp "//"  exp { $$ = node(); TRY_ARITHM("/", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "//"); }
+|   exp "^"   exp { $$ = node(); TRY_ARITHM("^", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "^"); }
+|   exp "%"   exp { $$ = node(); TRY_ARITHM("%", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "%"); }
+|   exp "&"   exp { $$ = node(); TRY_BITWISE("&", $$, $1, $3);   unify_binop_nodes($$, std::move($1), std::move($3), "&"); }
+|   exp "~"   exp { $$ = node(); TRY_BITWISE("~", $$, $1, $3);   unify_binop_nodes($$, std::move($1), std::move($3), "~"); }
+|   exp "|"   exp { $$ = node(); TRY_BITWISE("|", $$, $1, $3);   unify_binop_nodes($$, std::move($1), std::move($3), "|"); }
+|   exp ">>"  exp { $$ = node(); TRY_BITWISE(">>", $$, $1, $3);  unify_binop_nodes($$, std::move($1), std::move($3), ">>"); }
+|   exp "<<"  exp { $$ = node(); TRY_BITWISE("<<", $$, $1, $3);  unify_binop_nodes($$, std::move($1), std::move($3), "<<"); }
+|   exp ".."  exp { $$ = node(); TRY_CAT("..", $$, $1, $3);      unify_binop_nodes($$, std::move($1), std::move($3), ".."); }
+|   exp "<"   exp { $$ = node(); TRY_ORDER("<", $$, $1, $3);     unify_binop_nodes($$, std::move($1), std::move($3), "<"); }
+|   exp "<="  exp { $$ = node(); TRY_ORDER("<=", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), "<="); }
+|   exp ">"   exp { $$ = node(); TRY_ORDER(">", $$, $1, $3);     unify_binop_nodes($$, std::move($1), std::move($3), ">"); }
+|   exp ">="  exp { $$ = node(); TRY_ORDER(">=", $$, $1, $3);    unify_binop_nodes($$, std::move($1), std::move($3), ">="); }
+|   exp "=="  exp { $$ = node(); TRY_EQ("==", $$, $1, $3);       unify_binop_nodes($$, std::move($1), std::move($3), "=="); }
+|   exp "~="  exp { $$ = node(); TRY_NEQ("~=", $$, $1, $3);      unify_binop_nodes($$, std::move($1), std::move($3), "~="); }
+|   exp "and" exp { $$ = node(); TRY_LOGICAL("and", $$, $1, $3); unify_binop_nodes($$, std::move($1), std::move($3), "and"); }
+|   exp "or"  exp { $$ = node(); TRY_LOGICAL("or", $$, $1, $3);  unify_binop_nodes($$, std::move($1), std::move($3), "or"); }
 ;
 
 unop:

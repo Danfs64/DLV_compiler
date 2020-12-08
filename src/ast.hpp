@@ -66,7 +66,7 @@ enum class NodeKind : int {
 struct node {
 // private:
     inline static int nr; 
-    NodeKind kind;
+    NodeKind kind = NodeKind::NO_KIND;
     lua_things::expression expr;
     std::vector<node> children;
     float f_data;
