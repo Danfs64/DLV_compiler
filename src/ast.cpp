@@ -95,6 +95,7 @@ const char* kind2str(NodeKind kind) {
         case NodeKind::var_name:  return "var_name";
         case NodeKind::var_use:   return "var_use";
         case NodeKind::while_:    return "while";
+        case NodeKind::BLOCK:     return "BLOCK";
 
         // case NodeKind::b2i_node:      return "B2I";
         // case NodeKind::b2r_node:      return "B2R";

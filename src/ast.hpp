@@ -53,6 +53,7 @@ enum class NodeKind : int {
     var_use,
     while_,
     NO_KIND,  // Special kind for %empty rules
+    BLOCK,
 
     // Todas as conversões são em tempo de execução
     // B2I_NODE,   // Conversion of types.
@@ -66,7 +67,7 @@ enum class NodeKind : int {
 struct node {
 // private:
     inline static int nr; 
-    NodeKind kind;
+    NodeKind kind = NodeKind::NO_KIND;
     lua_things::expression expr;
     std::vector<node> children;
     float f_data;
