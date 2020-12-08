@@ -93,6 +93,9 @@ struct node {
     lua_things::expression& get_node_type();
     int get_child_count();
 
+    int var_count();
+    int node_count();
+
     void print_tree();
 };
 

@@ -46,6 +46,25 @@ int node::get_child_count() {
     return children.size();
 }
 
+int node::var_count() {
+    if (kind == NodeKind::var_name) {
+        return 1;
+    }
+    int total = 0;
+    for (auto& i : children) {
+        total += i.var_count();
+    }
+    return total;
+}
+
+int node::node_count() {
+    int total = 1;
+    for (auto& i : children) {
+        total += i.node_count();
+    }
+    return total;
+}
+
 
 // Dot output
 
