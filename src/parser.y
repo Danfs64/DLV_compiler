@@ -270,7 +270,12 @@ stat:
 |   "break" { if(!ctx.verify_break()) { error_break(); } }
 |   "goto" IDENTIFIER { ctx.add_goto_call(global::last_identifier); }
 |   "do" { NEW_SCOPE(NON_LOOP); } block "end" { REMOVE_SCOPE(); }
-|   "while" exp "do" { NEW_SCOPE(LOOP); } block "end" { REMOVE_SCOPE(); }
+|   "while" exp "do" { NEW_SCOPE(LOOP); CLEAR_NAME_EXP(); } block "end" {
+        REMOVE_SCOPE();
+        $$.kind = NodeKind::while_;
+        $$.add_child(std::move($2)); // exp
+        $$.add_child(std::move($5)); // block
+    }
 |   "repeat" { NEW_SCOPE(LOOP); } block "until" exp { REMOVE_SCOPE(); }
 |   "if" exp { CLEAR_NAME_EXP(); } "then" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); } loop_elseif opt_else "end" {
         CLEAR_NAME_EXP();
