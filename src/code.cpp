@@ -73,9 +73,25 @@ void gen_block_code(node& n) {
     std::function<void(node&)> stat_analyser;
     std::function<void(node&)> var_decl_analyser;
     std::function<void(node&)> block_analyser;
+    std::function<void(node&)> if_analyser;
     std::function<void(node&)> exp_generator;
     std::map<std::string, int> varToLocal;
-    int total_vars = 0;
+    int total_labels = 1;
+    int total_vars = 1;
+
+    if_analyser = [&] (node& if_node) {
+        node& if_exp = if_node.children[0];
+        node& if_block = if_node.children[1];
+        std::string if_label_name = "LABEL" + std::to_string(total_labels);
+        total_labels++;
+
+        exp_generator(if_exp);
+        stream << "invokeinterface dlvc/LuaType/boolValue()Z 1" << std::endl;
+        stream << "ifeq " << if_label_name << std::endl; // Se o valor retornado for 0 (falso) ir para label
+        total_labels++;
+        block_analyser(if_block);
+        stream << if_label_name << ":" << std::endl;
+    };
 
     exp_generator = [&] (node& exp) {
         for (auto& i : exp.children) {
@@ -87,6 +103,8 @@ void gen_block_code(node& n) {
             OP                                              \
             "(Ldlvc/LuaType;Ldlvc/LuaType;)Ldlvc/LuaType; " \
 
+        std::string& var_name = exp.expr.name;
+        int local_number = -1;
         switch (exp.kind) {
             case NodeKind::plus:
                 stream << o("plus") << std::endl;
@@ -106,11 +124,35 @@ void gen_block_code(node& n) {
             case NodeKind::mod:
                 stream << o("mod") << std::endl;
                 break;
+            case NodeKind::cat:
+                stream << o("cat") << std::endl;
+                break;
+            case NodeKind::and_:
+                stream << o("and") << std::endl;
+                break;
+            case NodeKind::or_:
+                stream << o("or") << std::endl;
+                break;
             case NodeKind::num_val:
                 stream << "new dlvc/LuaNumber" << std::endl;
                 stream << "dup" << std::endl;
                 stream << "ldc2_w " << std::to_string(exp.d_data) << std::endl;
                 stream << "invokespecial dlvc/LuaNumber/<init>(D)V" << std::endl;
+                break;
+            case NodeKind::bool_val:
+                stream << "new dlvc/LuaBool" << std::endl;
+                stream << "dup" << std::endl;
+                stream << "ldc " << std::to_string(exp.b_data) << std::endl;
+                stream << "invokespecial dlvc/LuaBool/<init>(Z)V" << std::endl;
+                break;
+            case NodeKind::nil_val:
+                stream << "new dlvc/LuaNil" << std::endl;
+                stream << "dup" << std::endl;
+                stream << "invokespecial dlvc/LuaNil/<init>()V" << std::endl;
+                break;
+            case NodeKind::var_use:
+                local_number = varToLocal.at(var_name);
+                stream << "aload " << local_number << " ; " << var_name << std::endl;
                 break;
             default:
                 std::cout << "Faltou implementar algo! " << kind2str(exp.kind) << std::endl;
@@ -131,7 +173,7 @@ void gen_block_code(node& n) {
         }
         
         if (var_decl.children.size() > 1) {
-            std::cout << "1!!" << std::endl;
+            // std::cout << "1!!" << std::endl;
             auto& exp_list = var_decl.children[1].children;
             for (int i = 0; i < exp_list.size(); ++i) {
                 auto& name = var_names[i];
@@ -143,12 +185,11 @@ void gen_block_code(node& n) {
         } else {
             for (int i = 0; i < var_names.size(); ++i) {
                 auto& name = var_names[i];
-                /*
-                TODO: recursão para gerar código NIL
-                criar novo NIL
-                inicializar?
-                */
-                // astore varToLocal[name]
+                // Preenche com nil
+                stream << "new dlvc/LuaNil" << std::endl;
+                stream << "dup" << std::endl;
+                stream << "invokespecial dlvc/LuaNil/<init>()V" << std::endl;
+                stream << "astore " << varToLocal[name.expr.name] << " ; " + name.expr.name <<std::endl;
             }
         }
     };
@@ -159,6 +200,9 @@ void gen_block_code(node& n) {
         switch (n.kind) {
             case NodeKind::var_decl:
                 var_decl_analyser(n);
+                break;
+            case NodeKind::if_:
+                if_analyser(n);
                 break;
             case NodeKind::BLOCK:
                 std::exit(254);
