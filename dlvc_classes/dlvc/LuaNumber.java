@@ -1,6 +1,6 @@
 package dlvc;
 
-class LuaNumber implements LuaType {
+public class LuaNumber implements LuaType {
     protected Double number;
 
     public LuaNumber(double n) {
@@ -10,5 +10,13 @@ class LuaNumber implements LuaType {
     @Override
     public int hashCode() {
        return number.hashCode(); 
+    }
+
+    public void print() {
+        System.out.println(number);
+    }
+
+    public String toString() {
+        return String.valueOf(number);
     }
 }
