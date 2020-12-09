@@ -1,4 +1,5 @@
 package dlvc;
 
-interface LuaType {
+public interface LuaType {
+    public boolean boolValue();
 }

@@ -19,4 +19,8 @@ public class LuaNumber implements LuaType {
     public String toString() {
         return String.valueOf(number);
     }
+
+    public boolean boolValue() {
+        return true;
+    }
 }
