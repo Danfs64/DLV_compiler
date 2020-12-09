@@ -42,6 +42,17 @@ public class LuaOpResolver {
         return new LuaNil();
     }
 
+    static public LuaType pow(LuaType lhs, LuaType rhs) {
+        if (lhs instanceof LuaNumber &&
+            rhs instanceof LuaNumber) {
+                LuaNumber lhsn = (LuaNumber) lhs;
+                LuaNumber rhsn = (LuaNumber) rhs;
+                return new LuaNumber(Math.pow(lhsn.number, rhsn.number));
+        }
+
+        return new LuaNil();
+    }
+
     static public LuaType over(LuaType lhs, LuaType rhs) {
         if (lhs instanceof LuaNumber &&
             rhs instanceof LuaNumber) {
@@ -53,12 +64,12 @@ public class LuaOpResolver {
         return new LuaNil();
     }
 
-    static public LuaType pow(LuaType lhs, LuaType rhs) {
+    static public LuaType iover(LuaType lhs, LuaType rhs) {
         if (lhs instanceof LuaNumber &&
             rhs instanceof LuaNumber) {
                 LuaNumber lhsn = (LuaNumber) lhs;
                 LuaNumber rhsn = (LuaNumber) rhs;
-                return new LuaNumber(Math.pow(lhsn.number, rhsn.number));
+                return new LuaNumber(Math.floor(lhsn.number / rhsn.number));
         }
 
         return new LuaNil();
@@ -100,6 +111,50 @@ public class LuaOpResolver {
         } else {
             return rhs;
         }
+    }
+
+    static public LuaType gt(LuaType lhs, LuaType rhs) {
+        if (lhs instanceof LuaNumber &&
+            rhs instanceof LuaNumber) {
+                LuaNumber lhsn = (LuaNumber) lhs;
+                LuaNumber rhsn = (LuaNumber) rhs;
+                return new LuaBool(lhsn.number > rhsn.number);
+        }
+
+        return new LuaNil();
+    }
+
+    static public LuaType ge(LuaType lhs, LuaType rhs) {
+        if (lhs instanceof LuaNumber &&
+            rhs instanceof LuaNumber) {
+                LuaNumber lhsn = (LuaNumber) lhs;
+                LuaNumber rhsn = (LuaNumber) rhs;
+                return new LuaBool(lhsn.number >= rhsn.number);
+        }
+
+        return new LuaNil();
+    }
+
+    static public LuaType lt(LuaType lhs, LuaType rhs) {
+        if (lhs instanceof LuaNumber &&
+            rhs instanceof LuaNumber) {
+                LuaNumber lhsn = (LuaNumber) lhs;
+                LuaNumber rhsn = (LuaNumber) rhs;
+                return new LuaBool(lhsn.number < rhsn.number);
+        }
+
+        return new LuaNil();
+    }
+
+    static public LuaType le(LuaType lhs, LuaType rhs) {
+        if (lhs instanceof LuaNumber &&
+            rhs instanceof LuaNumber) {
+                LuaNumber lhsn = (LuaNumber) lhs;
+                LuaNumber rhsn = (LuaNumber) rhs;
+                return new LuaBool(lhsn.number <= rhsn.number);
+        }
+
+        return new LuaNil();
     }
 
     // private class LuaTypePair {

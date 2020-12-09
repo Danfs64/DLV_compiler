@@ -37,10 +37,10 @@ const char* jasmin_end = R"(
 void generate_code(node& root) {
     char program[1000];
 
-    auto& var_decl = root.children.at(0);
-    auto& var_list = var_decl.children.at(0);
-    auto& exp_list = var_decl.children.at(1);
-    auto& exp = exp_list.children.at(0);
+    // auto& var_decl = root.children.at(0);
+    // auto& var_list = var_decl.children.at(0);
+    // auto& exp_list = var_decl.children.at(1);
+    // auto& exp = exp_list.children.at(0);
 
     stream << jasmin_start << std::endl;
     gen_block_code(root);
@@ -74,6 +74,7 @@ void gen_block_code(node& n) {
     std::function<void(node&)> var_decl_analyser;
     std::function<void(node&)> block_analyser;
     std::function<void(node&)> if_analyser;
+    std::function<void(node&)> for_analyser;
     std::function<void(node&)> exp_generator;
     std::map<std::string, int> varToLocal;
     int total_labels = 1;
@@ -88,9 +89,71 @@ void gen_block_code(node& n) {
         exp_generator(if_exp);
         stream << "invokeinterface dlvc/LuaType/boolValue()Z 1" << std::endl;
         stream << "ifeq " << if_label_name << std::endl; // Se o valor retornado for 0 (falso) ir para label
-        total_labels++;
+        // total_labels++;
         block_analyser(if_block);
         stream << if_label_name << ":" << std::endl;
+    };
+
+    for_analyser = [&] (node& for_node) {
+        bool custom_inc = false;
+        node& var_node = for_node.children.at(0);
+        node& exp1 = for_node.children.at(1);
+        node& exp2 = for_node.children.at(2);
+        std::string for_start_label = "LABEL" + std::to_string(total_labels);
+        total_labels++; 
+
+        stream << for_start_label << ":" << std::endl;
+
+        if (for_node.get_child_count() == 5) {
+            custom_inc = true;
+        }
+
+        auto& inc_var = for_node.children[0];
+
+        // Increment start value
+        exp_generator(exp1);
+        varToLocal.emplace(var_node.expr.name, total_vars);
+        int var_label_num = total_vars;
+        total_vars++;
+        stream << "astore " << std::to_string(var_label_num) << " ; " << var_node.expr.name << std::endl;
+
+        // BLOCK code
+        stream << " ; for loop block" << std::endl;
+        if (custom_inc) {
+            node& block_node = for_node.children.at(4);
+            block_analyser(block_node);
+        } else {
+            node& block_node = for_node.children.at(3);
+            block_analyser(block_node);
+        }
+
+        // Increment
+        stream << "aload " + std::to_string(var_label_num) << " ; " << var_node.expr.name << std::endl;
+        if (custom_inc) {
+            node& inc_exp = for_node.children.at(3);
+            exp_generator(inc_exp);
+            stream << "invokestatic dlvc/LuaOpResolver/plus(Ldlvc/LuaType;Ldlvc/LuaType;)Ldlvc/LuaType; " << std::endl;
+        } else {
+            // Generate LuaNumber with 1
+            stream << R"(
+                new dlvc/LuaNumber
+                dup
+                ldc2_w 1.0
+                invokespecial dlvc/LuaNumber/<init>(D)V
+                invokestatic dlvc/LuaOpResolver/plus(Ldlvc/LuaType;Ldlvc/LuaType;)Ldlvc/LuaType;
+            )" << std::endl;
+        }
+        stream << "astore " << std::to_string(var_label_num) << " ; " << var_node.expr.name << std::endl;
+
+
+        // Exp2 limit
+        stream << "aload " + std::to_string(var_label_num) << " ; " << var_node.expr.name << std::endl;
+        exp_generator(exp2);
+            stream << R"(
+                invokestatic dlvc/LuaOpResolver/gt(Ldlvc/LuaType;Ldlvc/LuaType;)Ldlvc/LuaType;
+            )" << std::endl;
+        stream << "invokeinterface dlvc/LuaType/boolValue()Z 1" << std::endl;
+        stream << "ifne " << for_start_label << std::endl; // Se o valor retornado for 0 (falso) sair do for
     };
 
     exp_generator = [&] (node& exp) {
@@ -119,11 +182,14 @@ void gen_block_code(node& n) {
             case NodeKind::times:
                 stream << o("times") << std::endl;
                 break;
+            case NodeKind::pow:
+                stream << o("pow") << std::endl;
+                break;
             case NodeKind::over:
                 stream << o("over") << std::endl;
                 break;
-            case NodeKind::pow:
-                stream << o("pow") << std::endl;
+            case NodeKind::iover:
+                stream << o("over") << std::endl;
                 break;
             case NodeKind::mod:
                 stream << o("mod") << std::endl;
@@ -136,6 +202,18 @@ void gen_block_code(node& n) {
                 break;
             case NodeKind::or_:
                 stream << o("or") << std::endl;
+                break;
+            case NodeKind::gt:
+                stream << o("gt") << std::endl;
+                break;
+            case NodeKind::ge:
+                stream << o("ge") << std::endl;
+                break;
+            case NodeKind::le:
+                stream << o("le") << std::endl;
+                break;
+            case NodeKind::lt:
+                stream << o("lt") << std::endl;
                 break;
             case NodeKind::num_val:
                 stream << "new dlvc/LuaNumber" << std::endl;
@@ -207,6 +285,9 @@ void gen_block_code(node& n) {
                 break;
             case NodeKind::if_:
                 if_analyser(n);
+                break;
+            case NodeKind::for_:
+                for_analyser(n);
                 break;
             case NodeKind::BLOCK:
                 std::exit(254);
