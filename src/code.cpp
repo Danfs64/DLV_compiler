@@ -110,7 +110,11 @@ void gen_block_code(node& n) {
                 stream << o("plus") << std::endl;
                 break;
             case NodeKind::minus:
-                stream << o("minus") << std::endl;
+                if (exp.get_child_count() == 2) {
+                    stream << o("minus") << std::endl;
+                } else {
+                    stream << "invokevirtual dlvc/LuaNumber/negate()Ldlvc/LuaType;" << std::endl;
+                }
                 break;
             case NodeKind::times:
                 stream << o("times") << std::endl;

@@ -23,4 +23,8 @@ public class LuaNumber implements LuaType {
     public boolean boolValue() {
         return true;
     }
+
+    public LuaType negate() {
+        return new LuaNumber(-number);
+    }
 }
