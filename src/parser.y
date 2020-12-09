@@ -162,8 +162,8 @@ opt_else:
 ;
 
 opt_comma_exp:
-    %empty
-|   "," exp
+    %empty        { $$ = node();        }
+|   "," exp       { $$ = std::move($2); }
 ;
 
 opt_parlist:
@@ -282,7 +282,13 @@ stat:
         $$.add_child(std::move($2)); // exp
         $$.add_child(std::move($5)); // block
     }
-|   "repeat" { NEW_SCOPE(LOOP); } block "until" exp { REMOVE_SCOPE(); }
+|   "repeat" { NEW_SCOPE(LOOP); } block "until" exp {
+        REMOVE_SCOPE();
+
+        $$.kind = NodeKind::repeat;
+        $$.add_child(std::move($3)); // Block
+        $$.add_child(std::move($5)); // Exp
+    }
 |   "if" exp { CLEAR_NAME_EXP(); } "then" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); } loop_elseif opt_else "end" {
         CLEAR_NAME_EXP();
 
@@ -306,7 +312,22 @@ stat:
         std::cerr << "for_init_id: " << global::for_init_id << std::endl;
         #endif
         add_symbol_last_scope(global::for_init_id, yylineno, ($5).expr.type);
-    } block "end" { REMOVE_SCOPE(); }
+    } block "end" {
+        REMOVE_SCOPE();
+
+        // AST
+        node id_node = node();
+        id_node.kind = NodeKind::var_name;
+        id_node.expr.name = global::for_init_id;
+        id_node.expr.type = $5.expr.type;
+        
+        $$.kind = NodeKind::for_;
+        $$.add_child(std::move(id_node)); // ID
+        $$.add_child(std::move($5)); // exp1
+        $$.add_child(std::move($7)); // exp2
+        $$.add_child(std::move($8)); // opt_comma_exp
+        $$.add_child(std::move($11)); // block
+    }
 |   "for" namelist "in" explist "do" {
         NEW_SCOPE(LOOP);
         ASSIGN_AND_CLEAR();
@@ -571,10 +592,10 @@ binop:
 ;
 
 unop:
-    "-"   exp     %prec "not" { TRY_UARITHM("-", $$, $2);  unify_uop_nodes($$, std::move($2), "-"); }
+    "-"   exp     %prec "not" { TRY_UARITHM("-", $$, $2);  unify_uop_nodes($$, std::move($2), "-");   }
 |   "not" exp                 { TRY_NOT("not", $$, $2);    unify_uop_nodes($$, std::move($2), "not"); }
-|   "#"   exp                 { TRY_LEN("#", $$, $2);      unify_uop_nodes($$, std::move($2), "#"); }
-|   "~"   exp     %prec "not" { TRY_UBITWISE("~", $$, $2); unify_uop_nodes($$, std::move($2), "~"); }
+|   "#"   exp                 { TRY_LEN("#", $$, $2);      unify_uop_nodes($$, std::move($2), "#");   }
+|   "~"   exp     %prec "not" { TRY_UBITWISE("~", $$, $2); unify_uop_nodes($$, std::move($2), "~");   }
 ;
 
 %%

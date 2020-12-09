@@ -86,6 +86,8 @@ const char* kind2str(NodeKind kind) {
         case NodeKind::elif:      return "elseif";
         case NodeKind::eq:        return "==";
         case NodeKind::exp_list:  return "exp_list";
+        case NodeKind::for_:      return "for =";
+        case NodeKind::for_in:    return "for in";
         case NodeKind::func_def:  return "function";
         case NodeKind::ge:        return ">=";
         case NodeKind::gt:        return ">";

@@ -24,6 +24,8 @@ enum class NodeKind : int {
     elif,
     eq,
     exp_list,
+    for_,
+    for_in,
     func_def,
     ge,
     gt,
