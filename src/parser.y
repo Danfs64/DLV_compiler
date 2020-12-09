@@ -150,7 +150,15 @@ opt_semi:
 
 opt_else:
     %empty { $$ = node(); }
-|   "else" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); }
+|   "else" { NEW_SCOPE(NON_LOOP); } block {
+        REMOVE_SCOPE();
+
+        // AST
+        node new_node = node();
+        new_node.kind = NodeKind::else_;
+        new_node.add_child(std::move($3));
+        $$ = std::move(new_node);
+    }
 ;
 
 opt_comma_exp:
@@ -207,7 +215,18 @@ loop_stat:
 
 loop_elseif:
     %empty  { $$ = node(); }
-|   loop_elseif "elseif" exp "then" { NEW_SCOPE(NON_LOOP); } block { REMOVE_SCOPE(); }
+|   loop_elseif "elseif" exp "then" { CLEAR_NAME_EXP(); NEW_SCOPE(NON_LOOP);} block {
+        REMOVE_SCOPE();
+
+        // AST
+        node new_node = node();
+        new_node.kind = NodeKind::elif;
+        new_node.add_child(std::move($3)); // exp
+        new_node.add_child(std::move($6)); // block
+
+        $1.add_child(std::move(new_node));
+        $$ = std::move($1);
+    }
 ;
 
 loop_dot_name:
@@ -262,6 +281,12 @@ stat:
         $$.add_child(std::move($6));
         $$.add_child(std::move($8));
         $$.add_child(std::move($9));
+
+        for (auto& i : $8.children) { // elseif
+            $$.add_child(std::move(i));
+        }
+
+        $$.add_child(std::move($9)); // else
     }
 |   "for" IDENTIFIER { global::for_init_id = global::last_identifier; } "=" exp "," exp opt_comma_exp "do" {
         CLEAR_NAME_EXP();
@@ -444,11 +469,11 @@ exp:
 ;
 
 primary:
-    "nil"            { $$ = node(NodeKind::nil_val,  luae(lua_things::Type::NIL));      }
-|   "false"          { $$ = node(NodeKind::bool_val, luae(lua_things::Type::BOOL));     }
-|   "true"           { $$ = node(NodeKind::bool_val, luae(lua_things::Type::BOOL));     }
-|   numeral          { $$ = node(NodeKind::num_val,  luae(lua_things::Type::NUM)); $$.d_data = $1.d_data;      }
-|   STRINGCONST      { $$ = node(NodeKind::str_val,  luae(lua_things::Type::STR));      }
+    "nil"            { $$ = node(NodeKind::nil_val,  luae(lua_things::Type::NIL));                         }
+|   "false"          { $$ = node(NodeKind::bool_val, luae(lua_things::Type::BOOL));  $$.b_data = false;     }
+|   "true"           { $$ = node(NodeKind::bool_val, luae(lua_things::Type::BOOL));  $$.b_data = true;      }
+|   numeral          { $$ = node(NodeKind::num_val,  luae(lua_things::Type::NUM));   $$.d_data = $1.d_data; }
+|   STRINGCONST      { $$ = node(NodeKind::str_val,  luae(lua_things::Type::STR));   $$.s_data = yytext;     }
 |   "..."            { $$ = node(NodeKind::table,    luae(lua_things::Type::TABLE));    }
 |   functiondef      { $$ = node(NodeKind::func_def, luae(lua_things::Type::FUNCTION)); }
 |   tableconstructor { $$ = node(NodeKind::table,    luae(lua_things::Type::TABLE));    }

@@ -19,6 +19,8 @@ enum class NodeKind : int {
     bor,
     call,
     cat,
+    else_,
+    elif,
     eq,
     exp_list,
     func_def,
@@ -73,6 +75,8 @@ struct node {
     float f_data;
     double d_data;
     int   i_data;
+    bool b_data;
+    std::string s_data;
 
     int print_node_dot();
     void print_dot();

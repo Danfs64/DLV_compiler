@@ -77,10 +77,12 @@ const char* kind2str(NodeKind kind) {
         case NodeKind::band:      return "&";
         case NodeKind::block:     return "block";
         case NodeKind::bnot:      return "~";
-        case NodeKind::bool_val:  return "";
+        case NodeKind::bool_val:  return "bool_val";
         case NodeKind::bor:       return "|";
         case NodeKind::call:      return "(...)";
         case NodeKind::cat:       return "..";
+        case NodeKind::else_:     return "else";
+        case NodeKind::elif:   return "elseif";
         case NodeKind::eq:        return "==";
         case NodeKind::exp_list:  return "exp_list";
         case NodeKind::func_def:  return "function";
@@ -106,7 +108,7 @@ const char* kind2str(NodeKind kind) {
         case NodeKind::program:   return "program";
         case NodeKind::repeat:    return "repeat";
         case NodeKind::rshift:    return ">>";
-        case NodeKind::str_val:   return "";
+        case NodeKind::str_val:   return "str_val";
         case NodeKind::table:     return "{}";
         case NodeKind::times:     return "*";
         case NodeKind::var_decl:  return "var_decl";
@@ -133,10 +135,12 @@ NodeKind str2kind(const char* kindstr) {
         {"&",        NodeKind::band},
         {"block",    NodeKind::block},
         {"~",        NodeKind::bnot},
-        {"",         NodeKind::bool_val},
+        {"bool_val", NodeKind::bool_val},
         {"|",        NodeKind::bor},
         {"(...)",    NodeKind::call},
         {"..",       NodeKind::cat},
+        {"else",     NodeKind::else_},
+        {"elseif",   NodeKind::elif},
         {"==",       NodeKind::eq},
         {"",         NodeKind::exp_list},
         {"function", NodeKind::func_def},
@@ -162,7 +166,7 @@ NodeKind str2kind(const char* kindstr) {
         {"program",  NodeKind::program},
         {"repeat",   NodeKind::repeat},
         {">>",       NodeKind::rshift},
-        {"",         NodeKind::str_val},
+        {"str_val",  NodeKind::str_val},
         {"{}",       NodeKind::table},
         {"*",        NodeKind::times},
         {"var_decl", NodeKind::var_decl},
@@ -250,6 +254,14 @@ int node::print_node_dot() {
             break;
         case NodeKind::num_val:
             name_str += "@" + std::to_string(d_data);
+            std::fprintf(stderr, label_template, my_nr, name_str.c_str());
+            break;
+        case NodeKind::bool_val:
+            name_str += "@" + std::to_string(b_data);
+            std::fprintf(stderr, label_template, my_nr, name_str.c_str());
+            break;
+        case NodeKind::str_val:
+            name_str += "@" + s_data;
             std::fprintf(stderr, label_template, my_nr, name_str.c_str());
             break;
         default:
