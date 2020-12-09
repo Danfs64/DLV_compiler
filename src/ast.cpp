@@ -81,10 +81,13 @@ const char* kind2str(NodeKind kind) {
         case NodeKind::bor:       return "|";
         case NodeKind::call:      return "(...)";
         case NodeKind::cat:       return "..";
+        case NodeKind::do_:       return "do";
         case NodeKind::else_:     return "else";
-        case NodeKind::elif:   return "elseif";
+        case NodeKind::elif:      return "elseif";
         case NodeKind::eq:        return "==";
         case NodeKind::exp_list:  return "exp_list";
+        case NodeKind::for_:      return "for =";
+        case NodeKind::for_in:    return "for in";
         case NodeKind::func_def:  return "function";
         case NodeKind::ge:        return ">=";
         case NodeKind::gt:        return ">";
@@ -139,6 +142,7 @@ NodeKind str2kind(const char* kindstr) {
         {"|",        NodeKind::bor},
         {"(...)",    NodeKind::call},
         {"..",       NodeKind::cat},
+        {"do",       NodeKind::do_},
         {"else",     NodeKind::else_},
         {"elseif",   NodeKind::elif},
         {"==",       NodeKind::eq},
