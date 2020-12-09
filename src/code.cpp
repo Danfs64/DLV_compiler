@@ -28,8 +28,8 @@ const char* jasmin_start = R"(
 
 const char* jasmin_end = R"(
     getstatic java/lang/System/out Ljava/io/PrintStream;
-    swap
-    invokevirtual java/io/PrintStream/println(D)V
+    aload 0
+    invokevirtual java/io/PrintStream/println(Ljava/lang/Object;)V
 	return	
 .end method
 )";
@@ -82,26 +82,42 @@ void gen_block_code(node& n) {
             exp_generator(i);
         }
 
+        #define o(OP)\
+            "invokestatic dlvc/LuaOpResolver/"              \
+            OP                                              \
+            "(Ldlvc/LuaType;Ldlvc/LuaType;)Ldlvc/LuaType; " \
+
         switch (exp.kind) {
             case NodeKind::plus:
-                stream << "dadd" << std::endl;
+                stream << o("plus") << std::endl;
                 break;
             case NodeKind::minus:
-                stream << "dsub" << std::endl;
+                stream << o("minus") << std::endl;
                 break;
             case NodeKind::times:
-                stream << "dmul" << std::endl;
+                stream << o("times") << std::endl;
                 break;
             case NodeKind::over:
-                stream << "ddiv" << std::endl;
+                stream << o("over") << std::endl;
+                break;
+            case NodeKind::pow:
+                stream << o("pow") << std::endl;
+                break;
+            case NodeKind::mod:
+                stream << o("mod") << std::endl;
                 break;
             case NodeKind::num_val:
+                stream << "new dlvc/LuaNumber" << std::endl;
+                stream << "dup" << std::endl;
                 stream << "ldc2_w " << std::to_string(exp.d_data) << std::endl;
+                stream << "invokespecial dlvc/LuaNumber/<init>(D)V" << std::endl;
                 break;
             default:
                 std::cout << "Faltou implementar algo! " << kind2str(exp.kind) << std::endl;
                 break;
         }
+
+        #undef o
     };
 
     var_decl_analyser = [&] (node& var_decl) {
@@ -121,7 +137,7 @@ void gen_block_code(node& n) {
                 auto& name = var_names[i];
                 auto& exp = exp_list[i];
                 exp_generator(exp);
-                stream << "dstore " << varToLocal[name.expr.name] << " ; " + name.expr.name <<std::endl;
+                stream << "astore " << varToLocal[name.expr.name] << " ; " + name.expr.name <<std::endl;
                 // astore varToLocal[name]
             }
         } else {
