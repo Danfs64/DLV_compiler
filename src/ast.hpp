@@ -19,6 +19,7 @@ enum class NodeKind : int {
     bor,
     call,
     cat,
+    do_,
     else_,
     elif,
     eq,

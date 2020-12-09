@@ -269,7 +269,13 @@ stat:
 |   label
 |   "break" { if(!ctx.verify_break()) { error_break(); } }
 |   "goto" IDENTIFIER { ctx.add_goto_call(global::last_identifier); }
-|   "do" { NEW_SCOPE(NON_LOOP); } block "end" { REMOVE_SCOPE(); }
+|   "do" { NEW_SCOPE(NON_LOOP); } block "end" {
+        REMOVE_SCOPE();
+        // AST
+        $$ = node();
+        $$.kind = NodeKind::do_;
+        $$.add_child(std::move($3)); // block
+    }
 |   "while" exp "do" { NEW_SCOPE(LOOP); CLEAR_NAME_EXP(); } block "end" {
         REMOVE_SCOPE();
         $$.kind = NodeKind::while_;
