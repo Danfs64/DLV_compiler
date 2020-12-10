@@ -86,11 +86,28 @@ void gen_block_code(node& n, std::stringstream& stream,
     std::function<void(node&)> assign_analyser;
     std::function<void(node&)> function_analyser;
     std::function<void(node&)> call_analyser;
+    std::function<void(node&)> var_use_analyser;
     std::function<void(node&)> return_analyser;
     std::function<void(node&)> exp_generator;
     std::function<void(node&)> table_generator;
     int total_labels = 1;
     int total_vars = varToLocal.size() + 1;
+
+
+    var_use_analyser = [&] (node& var_node) {
+        std::string& var_name = var_node.expr.name;
+        int local_number = varToLocal.at(var_name);
+        stream << "aload " << local_number << " ; " << var_name << std::endl;
+        if (var_node.get_child_count() > 0) { // É uma tabela
+            node& child = var_node.get_child(0);
+            exp_generator(child);
+            // stream << "new dlvc/LuaString" << std::endl;
+            // stream << "ldc " << child.expr.name << std::endl;
+            // stream << "invokespecial dlvc/LuaString/<init>(Ljava/lang/String;)V" << std::endl;
+            stream << "invokevirtual dlvc/LuaTable/get(Ldlvc/LuaType;)Ldlvc/LuaType; " << std::endl;
+        }
+    };
+
 
     table_generator = [&] (node& table_node) {
         // std::cout << kind2str(table_node.kind) << std::endl;
@@ -199,7 +216,26 @@ void gen_block_code(node& n, std::stringstream& stream,
             std::string& var_name = var_name_node.expr.name;
 
             int local = varToLocal.at(var_name);
-            ASTORE(local, var_name);
+            if (var_name_node.get_child_count() > 0) {
+                stream << "aload " << std::to_string(local) << std::endl;
+                // Atualizar dado de uma tabela
+                node* start_node = &var_name_node.get_child(0);
+                while (start_node->get_child_count() > 0) {
+                    exp_generator(*start_node);
+                    // stream << "ldc " << start_node->expr.name << std::endl;
+                    stream << "invokevirtual dlvc/LuaTable/get(Ldlvc/LuaType;)Ldlvc/LuaType; "
+                           << std::endl;
+                    start_node = &start_node->get_child(0);
+                }
+                stream << "swap ; Mantém a expressão acima da tabela" << std::endl;
+                exp_generator(*start_node);
+                // stream << "ldc " << start_node->expr.name << std::endl;
+                stream << "swap ; Mantém a expressão acima da string" << std::endl;
+                stream << "invokevirtual dlvc/LuaTable/put(Ldlvc/LuaType;Ldlvc/LuaType;)V"
+                       << std::endl;
+            } else {
+                ASTORE(local, var_name);
+            }
         }
     };
 
@@ -234,6 +270,28 @@ void gen_block_code(node& n, std::stringstream& stream,
         // total_labels++;
         block_analyser(if_block);
         stream << if_label_name << ":" << std::endl;
+
+        // Ver elseif-else
+        if (if_node.get_child_count() > 2) {
+            for (auto iter = std::begin(if_node.children) + 2;
+                 iter != std::end(if_node.children);
+                 ++iter) {
+                auto& i = *iter;
+                if (i.get_child_count() > 1) {
+                    std::string i_label_name = "LABEL" + std::to_string(total_labels++);
+                    node& i_exp = i.get_child(0);
+                    node& i_block = i.get_child(1);
+                    exp_generator(if_exp);
+                    stream << "invokeinterface dlvc/LuaType/boolValue()Z 1" << std::endl;
+                    stream << "ifeq " << i_label_name << std::endl;
+                    block_analyser(i_block);
+                    stream << i_label_name << ":" << std::endl;
+                } else {
+                    node& i_block = i.get_child(0);
+                    block_analyser(i_block);
+                }
+            }
+        }
     };
 
     for_analyser = [&] (node& for_node) {
@@ -298,13 +356,13 @@ void gen_block_code(node& n, std::stringstream& stream,
     };
 
     exp_generator = [&] (node& exp) {
-        if (exp.kind != NodeKind::table_entry and
-            exp.kind != NodeKind::call        and
+        if (exp.kind != NodeKind::table and
+            exp.kind != NodeKind::call  and
             exp.kind != NodeKind::var_use) {
             for (auto& i : exp.children) {
                 // table_entry não é uma expressão
                     exp_generator(i);
-                }
+            }
         }
 
         #define o(OP)\
@@ -415,8 +473,9 @@ void gen_block_code(node& n, std::stringstream& stream,
                 stream << "invokespecial dlvc/LuaString/<init>(Ljava/lang/String;)V" << std::endl;
                 break;
             case NodeKind::var_use:
-                local_number = varToLocal.at(var_name);
-                stream << "aload " << local_number << " ; " << var_name << std::endl;
+                // local_number = varToLocal.at(var_name);
+                // stream << "aload " << local_number << " ; " << var_name << std::endl;
+                var_use_analyser(exp);
                 break;
             default:
                 std::cout << "Faltou implementar algo! " << kind2str(exp.kind) << std::endl;
