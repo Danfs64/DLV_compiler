@@ -199,8 +199,8 @@ opt_comma_elip:
 ;
 
 opt_fieldlist:
-    %empty
-|   fieldlist
+    %empty       { $$ = node(); }
+|   fieldlist    { $$ = node(); $$ = std::move($1);  }
 ;
 
 opt_fieldsep:
@@ -238,7 +238,10 @@ loop_dot_name:
 
 loop_fields:
     %empty  { $$ = node(); }
-|   loop_fields fieldsep field
+|   loop_fields fieldsep field  {
+        $1.add_child(std::move($3));
+        $$ = std::move($1);
+    }
 ;
 
 // --- Rules
@@ -389,7 +392,7 @@ stat:
 ;
 
 retstat:
-    "return" opt_explist opt_semi
+    "return" opt_explist opt_semi  { $$.kind = NodeKind::return_; $$.add_child(std::move($2));  }
 
 label:
     "::" IDENTIFIER { add_label(yytext); ctx.add_goto_label(global::last_identifier); } "::"
@@ -456,7 +459,12 @@ var:
         }
     }
 |   primary { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, $1, $2); }
-|   var     { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, $1, $2); }
+|   var     { global::is_index = true; } index {
+        global::is_index = false;
+        TRY_INDEX($$, $1, $2);
+        $1.add_child(std::move($3));
+        $$ = std::move($1);
+    }
 |   call    { global::is_index = true; } index {
         global::is_index = false;
         auto return_node = node(NodeKind::table, luae(luat::TABLE));
@@ -467,8 +475,13 @@ var:
 ;
 
 index:
-    "[" { global::lock_list = true; } exp { global::lock_list = false; } "]"       { $$ = $2; pop_namelist(); add_namelist(global::null_identifier); }
-|   "." IDENTIFIER    { $$ = $2; pop_namelist(); add_namelist(global::null_identifier); }
+    "[" { global::lock_list = true; } exp { global::lock_list = false; } "]"    { $$ = std::move($2); pop_namelist(); add_namelist(global::null_identifier); }
+|   "." IDENTIFIER    {
+        $$.kind = NodeKind::str_val;
+        $$.s_data = global::last_identifier;
+        pop_namelist();
+        add_namelist(global::null_identifier);
+    }
 ;
 
 namelist:
@@ -518,7 +531,7 @@ primary:
 |   STRINGCONST      { $$ = node(NodeKind::str_val,  luae(lua_things::Type::STR));   $$.s_data = yytext;     }
 |   "..."            { $$ = node(NodeKind::table,    luae(lua_things::Type::TABLE));    }
 |   functiondef      { $$ = node(NodeKind::func_def, luae(lua_things::Type::FUNCTION)); }
-|   tableconstructor { $$ = node(NodeKind::table,    luae(lua_things::Type::TABLE));    }
+|   tableconstructor { $$ = std::move($1); }
 |   "(" exp ")"      { $$ = $2; }
 ;
 
@@ -580,17 +593,33 @@ parlist:
 ;
 
 tableconstructor:
-    "{" opt_fieldlist "}"
+    "{" opt_fieldlist "}" {
+        $$ = node();
+        $$ = node(NodeKind::table, luae(lua_things::Type::TABLE));
+        for (auto& i : $2.children)
+            $$.add_child(std::move(i));
+    }
 ;
 
 fieldlist:
-    field loop_fields opt_fieldsep
+    field loop_fields opt_fieldsep  {
+        $$ = node();
+        $$.kind = NodeKind::table;
+        $$.add_child(std::move($1));
+        for (auto& i : $2.children) {
+           $$.add_child(std::move(i)); 
+        }
+    }
 ;
 
 field:
-    "[" exp "]" "=" exp            /* VERIFICAR se exp do índice é nil */
-|   IDENTIFIER "=" exp
-|   exp
+    "[" exp "]" "=" exp     { $$.kind = NodeKind::table_entry; $$.add_child(std::move($2)); $$.add_child(std::move($5)); }           /* VERIFICAR se exp do índice é nil */
+|   IDENTIFIER { $1.kind = NodeKind::str_val; $1.s_data = global::last_identifier; } "=" exp      {
+	$$.kind = NodeKind::table_entry;
+	$$.add_child(std::move($1));
+	$$.add_child(std::move($4));
+    }
+|   exp                     { $$.kind = NodeKind::table_entry; $$.add_child(std::move($1));  }
 ;
 
 fieldsep:
