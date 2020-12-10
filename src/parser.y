@@ -303,8 +303,8 @@ stat:
         $$.kind = NodeKind::if_;
         $$.add_child(std::move($2));
         $$.add_child(std::move($6));
-        $$.add_child(std::move($8));
-        $$.add_child(std::move($9));
+        // $$.add_child(std::move($8));
+        // $$.add_child(std::move($9));
 
         for (auto& i : $8.children) { // elseif
             $$.add_child(std::move(i));
