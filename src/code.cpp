@@ -1,5 +1,7 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
+#include <ios>
 #include <functional>
 #include <map>
 #include <filesystem>
@@ -16,11 +18,13 @@
 namespace fs = std::filesystem;
 
 static fs::path jasmin_path = "cuspido2.j";
-static std::ofstream stream(jasmin_path);
+static std::ofstream fstream(jasmin_path);
 
 
-void gen_block_code(node& n);
-void gen_code_node(node& n);
+void gen_block_code(node& n, std::stringstream& stream,
+                    std::map<std::string, int>& varToLocal);
+
+std::vector<std::stringstream> all_streams;
 
 const char* jasmin_start = R"(
 .class public Jasmin
@@ -40,37 +44,21 @@ const char* jasmin_end = R"(
 
 void generate_code(node& root) {
 
-    // auto& var_decl = root.children.at(0);
-    // auto& var_list = var_decl.children.at(0);
-    // auto& exp_list = var_decl.children.at(1);
-    // auto& exp = exp_list.children.at(0);
+    fstream << jasmin_start << std::endl;
 
-    stream << jasmin_start << std::endl;
-    gen_block_code(root);
-    stream << jasmin_end << std::endl;
+    std::stringstream ss;
+    std::map<std::string, int> varToLocal;
+    gen_block_code(root, ss, varToLocal);
+    fstream << ss.str();
+    fstream << jasmin_end << std::endl;
 
-}
-
-
-void gen_code_node(node& n) {
-    for (auto& i : n.children) {
-        gen_code_node(i);
-    }
-
-    if (n.kind == NodeKind::num_val) {
-        stream << "ldc2_w " << std::to_string(n.d_data) << std::endl;
-    }
-
-    switch (n.kind) {
-        case NodeKind::plus:
-            stream << "dadd" << std::endl;
-            break;
-        default:
-            break;
+    for (auto& ss : all_streams) {
+        fstream << ss.str() << std::endl;
     }
 }
 
-void gen_block_code(node& n) {
+void gen_block_code(node& n, std::stringstream& stream,
+                    std::map<std::string, int>& varToLocal) {
     std::function<void(node&)> stat_analyser;
     std::function<void(node&)> var_decl_analyser;
     std::function<void(node&)> block_analyser;
@@ -78,10 +66,56 @@ void gen_block_code(node& n) {
     std::function<void(node&)> for_analyser;
     std::function<void(node&)> while_analyser;
     std::function<void(node&)> assign_analyser;
+    std::function<void(node&)> function_analyser;
     std::function<void(node&)> exp_generator;
-    std::map<std::string, int> varToLocal;
     int total_labels = 1;
-    int total_vars = 1;
+    int total_vars = varToLocal.size() + 1;
+
+    function_analyser = [&] (node& func_node) {
+        std::stringstream new_stream;
+        std::map<std::string, int> newVarToLocal;
+
+        std::string funcname = func_node.children.at(0).expr.name;
+        node& fbody = func_node.children.at(1);
+        bool has_args = fbody.get_child_count() > 1;
+
+        if (has_args) {
+            node& var_list = fbody.children.at(0);
+            int newTotalVars = 0; // Zero porque o método é estático
+            for (auto& i : var_list.children) {
+                std::string arg_name = i.expr.name;
+                newVarToLocal.emplace(arg_name, newTotalVars++);
+            }
+        }
+
+        node& block_node = fbody.children.at(has_args ? 1 : 0);
+
+        // Adicionar metadados main([Ljava/lang/String;)V"
+        new_stream << ".method public static " << funcname
+                   << "(";
+        if (has_args) {
+            node& var_list = fbody.children.at(0);
+            for (int i = 0; i < var_list.get_child_count(); ++i) {
+                new_stream << "Ldlvc/LuaType;";
+            }
+        }
+        new_stream << ")Ldlvc/LuaType;" << std::endl;
+        new_stream << "    .limit locals 50" << std::endl;
+        new_stream << "    .limit stack 50" << std::endl;
+
+        gen_block_code(block_node, new_stream, newVarToLocal);
+
+        // default nil return type
+        
+        new_stream << R"(
+            ; [[DEFAULT RETURN VALUE]]
+            new dlvc/LuaNil
+            dup
+            invokespecial dlvc/LuaNil/<init>()V
+            areturn
+            .end method)" << std::endl;
+        all_streams.push_back(std::move(new_stream));
+    };
 
     assign_analyser = [&] (node& assign_node) {
         node& var_list = assign_node.children.at(0);
@@ -360,11 +394,14 @@ void gen_block_code(node& n) {
             case NodeKind::assign:
                 assign_analyser(n);
                 break;
+            case NodeKind::func_def:
+                function_analyser(n);
+                break;
             case NodeKind::BLOCK:
                 std::exit(254);
                 break;
             default:
-                std::cout << "Algo de errado não está certo!" << std::endl;
+                std::cout << "Algo de errado não está certo! " << kind2str(n.kind) << std::endl;
                 break;
         }
     };
