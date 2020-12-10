@@ -9,6 +9,10 @@
 #include "code.hpp"
 #include "ast.hpp"
 
+#define ASTORE(I, N) \
+    stream << "astore " << std::to_string(I) \
+           << " ; " << N << std::endl;
+
 namespace fs = std::filesystem;
 
 static fs::path jasmin_path = "cuspido2.j";
@@ -35,7 +39,6 @@ const char* jasmin_end = R"(
 )";
 
 void generate_code(node& root) {
-    char program[1000];
 
     // auto& var_decl = root.children.at(0);
     // auto& var_list = var_decl.children.at(0);
@@ -46,8 +49,6 @@ void generate_code(node& root) {
     gen_block_code(root);
     stream << jasmin_end << std::endl;
 
-
-    return;
 }
 
 
@@ -83,6 +84,22 @@ void gen_block_code(node& n) {
     int total_vars = 1;
 
     assign_analyser = [&] (node& assign_node) {
+        node& var_list = assign_node.children.at(0);
+        node& exp_list = assign_node.children.at(1);
+
+        for (node& i : exp_list.children) {
+            exp_generator(i);
+        }
+
+        for (auto iter = std::rbegin(var_list.children);
+             iter != std::rend(var_list.children);
+             ++iter) {
+            node& var_name_node = *iter;
+            std::string& var_name = var_name_node.expr.name;
+
+            int local = varToLocal.at(var_name);
+            ASTORE(local, var_name);
+        }
     };
 
     while_analyser = [&] (node& while_node) {
@@ -213,7 +230,7 @@ void gen_block_code(node& n) {
                 stream << o("over") << std::endl;
                 break;
             case NodeKind::iover:
-                stream << o("over") << std::endl;
+                stream << o("iover") << std::endl;
                 break;
             case NodeKind::mod:
                 stream << o("mod") << std::endl;
@@ -256,6 +273,12 @@ void gen_block_code(node& n) {
                 break;
             case NodeKind::lt:
                 stream << o("lt") << std::endl;
+                break;
+            case NodeKind::eq:
+                stream << o("eq") << std::endl;
+                break;
+            case NodeKind::neq:
+                stream << o("neq") << std::endl;
                 break;
             case NodeKind::num_val:
                 stream << "new dlvc/LuaNumber" << std::endl;
