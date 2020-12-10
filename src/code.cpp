@@ -19,6 +19,7 @@ namespace fs = std::filesystem;
 
 static fs::path jasmin_path = "cuspido2.j";
 static std::ofstream fstream(jasmin_path);
+static const char* luaTypeDescriptor = "Ldlvc/LuaType;";
 
 
 void gen_block_code(node& n, std::stringstream& stream,
@@ -67,10 +68,36 @@ void gen_block_code(node& n, std::stringstream& stream,
     std::function<void(node&)> while_analyser;
     std::function<void(node&)> assign_analyser;
     std::function<void(node&)> function_analyser;
+    std::function<void(node&)> call_analyser;
+    std::function<void(node&)> return_analyser;
     std::function<void(node&)> exp_generator;
+    std::function<void(node&)> table_generator;
     int total_labels = 1;
     int total_vars = varToLocal.size() + 1;
 
+    table_generator = [&] (node& table_node) {
+    };
+
+    call_analyser = [&] (node& call_node) {
+        std::string& fname = call_node.get_child(0).expr.name;
+        node& exp_list = call_node.get_child(1);
+        for (auto& i : exp_list.children)
+            exp_generator(i);
+
+        stream << "invokestatic Jasmin/" << fname << "(";
+        for (int i = 0; i < exp_list.get_child_count(); ++i)
+            stream << luaTypeDescriptor;
+        stream << ")" << luaTypeDescriptor << std::endl;
+    };
+
+    return_analyser = [&] (node& return_node) {
+        if (return_node.get_child_count() > 0) {
+            node& exp = return_node.children.at(0).get_child(0);
+            exp_generator(exp);
+            stream << "areturn" << std::endl;
+        }
+    };
+    
     function_analyser = [&] (node& func_node) {
         std::stringstream new_stream;
         std::map<std::string, int> newVarToLocal;
@@ -314,6 +341,9 @@ void gen_block_code(node& n, std::stringstream& stream,
             case NodeKind::neq:
                 stream << o("neq") << std::endl;
                 break;
+            case NodeKind::table:
+                table_generator(exp);
+                break;
             case NodeKind::num_val:
                 stream << "new dlvc/LuaNumber" << std::endl;
                 stream << "dup" << std::endl;
@@ -396,6 +426,12 @@ void gen_block_code(node& n, std::stringstream& stream,
                 break;
             case NodeKind::func_def:
                 function_analyser(n);
+                break;
+            case NodeKind::return_:
+                return_analyser(n);
+                break;
+            case NodeKind::call:
+                call_analyser(n);
                 break;
             case NodeKind::BLOCK:
                 std::exit(254);
