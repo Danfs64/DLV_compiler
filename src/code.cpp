@@ -298,10 +298,13 @@ void gen_block_code(node& n, std::stringstream& stream,
     };
 
     exp_generator = [&] (node& exp) {
-        for (auto& i : exp.children) {
-            // table_entry não é uma expressão
-            if (i.kind != NodeKind::table_entry)
-                exp_generator(i);
+        if (exp.kind != NodeKind::table_entry and
+            exp.kind != NodeKind::call        and
+            exp.kind != NodeKind::var_use) {
+            for (auto& i : exp.children) {
+                // table_entry não é uma expressão
+                    exp_generator(i);
+                }
         }
 
         #define o(OP)\
@@ -384,6 +387,9 @@ void gen_block_code(node& n, std::stringstream& stream,
                 break;
             case NodeKind::table:
                 table_generator(exp);
+                break;
+            case NodeKind::call:
+                call_analyser(exp);
                 break;
             case NodeKind::num_val:
                 stream << "new dlvc/LuaNumber" << std::endl;
