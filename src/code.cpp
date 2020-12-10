@@ -27,6 +27,21 @@ void gen_block_code(node& n, std::stringstream& stream,
 
 std::vector<std::stringstream> all_streams;
 
+static const char* print_jasmin = R"(
+.method public static print(Ldlvc/LuaType;)Ldlvc/LuaType;
+.limit locals 10
+.limit stack 10
+getstatic java/lang/System/out Ljava/io/PrintStream;
+aload 0
+invokevirtual java/io/PrintStream/println(Ljava/lang/Object;)V
+
+new dlvc/LuaNil
+dup
+invokespecial dlvc/LuaNil/<init>()V
+areturn
+.end method
+)";
+
 const char* jasmin_start = R"(
 .class public Jasmin
 .super java/lang/Object
@@ -39,7 +54,7 @@ const char* jasmin_end = R"(
     getstatic java/lang/System/out Ljava/io/PrintStream;
     aload 0
     invokevirtual java/io/PrintStream/println(Ljava/lang/Object;)V
-	return	
+    return	
 .end method
 )";
 
@@ -56,6 +71,8 @@ void generate_code(node& root) {
     for (auto& ss : all_streams) {
         fstream << ss.str() << std::endl;
     }
+
+    fstream << print_jasmin << std::endl;
 }
 
 void gen_block_code(node& n, std::stringstream& stream,
@@ -274,9 +291,8 @@ void gen_block_code(node& n, std::stringstream& stream,
         // Exp2 limit
         stream << "aload " + std::to_string(var_label_num) << " ; " << var_node.expr.name << std::endl;
         exp_generator(exp2);
-            stream << R"(
-                invokestatic dlvc/LuaOpResolver/gt(Ldlvc/LuaType;Ldlvc/LuaType;)Ldlvc/LuaType;
-            )" << std::endl;
+        stream << "invokestatic dlvc/LuaOpResolver/gt(Ldlvc/LuaType;Ldlvc/LuaType;)Ldlvc/LuaType;"
+               << std::endl;
         stream << "invokeinterface dlvc/LuaType/boolValue()Z 1" << std::endl;
         stream << "ifne " << for_start_label << std::endl; // Se o valor retornado for 0 (falso) sair do for
     };
@@ -463,6 +479,11 @@ void gen_block_code(node& n, std::stringstream& stream,
                 break;
             case NodeKind::call:
                 call_analyser(n);
+                /*
+                 * Se a chamada é um statement significa que o valor retornado
+                 * deve ser jogado fora
+                 */
+                stream << "pop" << std::endl;
                 break;
             case NodeKind::BLOCK:
                 std::exit(254);
