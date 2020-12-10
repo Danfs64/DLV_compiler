@@ -105,7 +105,7 @@ public class LuaOpResolver {
     }
 
     static public LuaType and(LuaType lhs, LuaType rhs) {
-        return lhs.boolValue() ? lhs : rhs;
+        return lhs.boolValue() ? rhs : lhs;
     }
 
     static public LuaType or(LuaType lhs, LuaType rhs) {
