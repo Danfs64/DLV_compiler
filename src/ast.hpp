@@ -17,6 +17,7 @@ enum class NodeKind : int {
     bnot,
     bool_val,
     bor,
+    break_,
     call,
     cat,
     do_,

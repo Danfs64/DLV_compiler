@@ -276,7 +276,7 @@ stat:
     }
 |   call                            %prec ";"                    { CLEAR_NAME_EXP(); $$ = std::move($1); } 
 |   label
-|   "break" { if(!ctx.verify_break()) { error_break(); } }
+|   "break" { if(!ctx.verify_break()) { error_break(); }   $$ = node(); $$.kind = NodeKind::break_;}
 |   "goto" IDENTIFIER { ctx.add_goto_call(global::last_identifier); }
 |   "do" { NEW_SCOPE(NON_LOOP); } block "end" {
         REMOVE_SCOPE();
