@@ -6,16 +6,11 @@ const char* type_error_message = "Incompatible types.";
 using lt = lua_things::Type;
 
 lua_things::Type lua_things::check_arithm(lua_things::Type t1, lua_things::Type t2) { 
-    if (t1 == lt::NUM && t2 == lt::NUM) {                
+    if ((t1 == lt::NUM or t1 == lt::STR) and
+        (t2 == lt::NUM or t2 == lt::STR)) {                
         return lt::NUM;                                    
     } else if (t1 == lt::TABLE || t2 == lt::TABLE) {     
         return lt::TABLE;                                  
-    } else if (t1 == lt::STR && t2 == lt::NUM ||         
-                t1 == lt::NUM && t2 == lt::STR) {         
-        /* Suponhamos que a string é um float no             
-            formato correto                                   
-        */                                                   
-        return lt::NUM;                                    
     } else {                                                 
         throw lua_things::type_error(type_error_message);                
     }                                                        
@@ -152,7 +147,7 @@ o(check_cat)
 o(check_index)
 #undef o
 
-#define o(func)                                                             \
+#define o(func)                                          \
     lua_things::expression lua_things:: func (lua_things::expression t1) {  \
         lt t = func (t1.type);                                              \
         return expression(t);                                               \

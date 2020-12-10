@@ -79,6 +79,7 @@ const char* kind2str(NodeKind kind) {
         case NodeKind::bnot:         return "~";
         case NodeKind::bool_val:     return "bool_val";
         case NodeKind::bor:          return "|";
+        case NodeKind::break_:       return "break";
         case NodeKind::call:         return "(...)";
         case NodeKind::cat:          return "..";
         case NodeKind::do_:          return "do";

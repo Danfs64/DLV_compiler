@@ -16,6 +16,8 @@
 #include <iostream>
 #include <exception>
 #include <stdexcept>
+#include <sstream>
+#include <iomanip>
 #include "lua_things.hpp"
 #include "data_structures.hpp"
 #include "error_messages.hpp"
@@ -274,7 +276,7 @@ stat:
     }
 |   call                            %prec ";"                    { CLEAR_NAME_EXP(); $$ = std::move($1); } 
 |   label
-|   "break" { if(!ctx.verify_break()) { error_break(); } }
+|   "break" { if(!ctx.verify_break()) { error_break(); }   $$ = node(); $$.kind = NodeKind::break_;}
 |   "goto" IDENTIFIER { ctx.add_goto_call(global::last_identifier); }
 |   "do" { NEW_SCOPE(NON_LOOP); } block "end" {
         REMOVE_SCOPE();
@@ -351,6 +353,8 @@ stat:
         $$.kind = NodeKind::func_def;
         $$.add_child(std::move($2));
         $$.add_child(std::move($4));
+
+        CLEAR_NAME_EXP();
     }
 |   "local" "function" IDENTIFIER {
         add_symbol_last_scope(global::last_identifier, yylineno, lua_things::Type::FUNCTION);
@@ -388,6 +392,8 @@ stat:
         if ($5.kind != NodeKind::NO_KIND) {
             $$.add_child(std::move($5));
         }
+
+        CLEAR_NAME_EXP();
     }
 ;
 
@@ -528,7 +534,12 @@ primary:
 |   "false"          { $$ = node(NodeKind::bool_val, luae(lua_things::Type::BOOL));  $$.b_data = false;     }
 |   "true"           { $$ = node(NodeKind::bool_val, luae(lua_things::Type::BOOL));  $$.b_data = true;      }
 |   numeral          { $$ = node(NodeKind::num_val,  luae(lua_things::Type::NUM));   $$.d_data = $1.d_data; }
-|   STRINGCONST      { $$ = node(NodeKind::str_val,  luae(lua_things::Type::STR));   $$.s_data = yytext;     }
+|   STRINGCONST      { $$ = node(NodeKind::str_val,  luae(lua_things::Type::STR));
+                       std::string tmp = yytext;
+                       tmp.erase(0, 1);
+                       tmp.erase(tmp.size() - 1);
+                       $$.s_data = tmp;
+                     }
 |   "..."            { $$ = node(NodeKind::table,    luae(lua_things::Type::TABLE));    }
 |   functiondef      { $$ = node(NodeKind::func_def, luae(lua_things::Type::FUNCTION)); }
 |   tableconstructor { $$ = std::move($1); }
