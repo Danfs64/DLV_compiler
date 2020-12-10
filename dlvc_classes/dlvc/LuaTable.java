@@ -3,7 +3,7 @@ package dlvc;
 import java.util.HashMap;
 import java.util.Map;
 
-class LuaTable implements LuaType {
+public class LuaTable implements LuaType {
     private Map<LuaType, LuaType> map = new HashMap<>();
 
     public LuaType get(LuaType obj) {

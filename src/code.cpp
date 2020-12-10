@@ -76,6 +76,29 @@ void gen_block_code(node& n, std::stringstream& stream,
     int total_vars = varToLocal.size() + 1;
 
     table_generator = [&] (node& table_node) {
+        // std::cout << kind2str(table_node.kind) << std::endl;
+        stream << R"(
+            new dlvc/LuaTable
+            dup
+            invokespecial dlvc/LuaTable/<init>()V)" << std::endl;
+        double start_num_key = 1;
+        for (auto& i : table_node.children) {
+            stream << "dup ; duplica referencia para cada set" << std::endl;
+            if (i.get_child_count() == 1) {
+                stream << "new dlvc/LuaNumber" << std::endl;
+                stream << "dup" << std::endl;
+                stream << "ldc2_w " << std::to_string(start_num_key++) << std::endl;
+                stream << "invokespecial dlvc/LuaNumber/<init>(D)V" << std::endl;
+                // std::cout << kind2str(i.get_child(0).kind) << std::endl;
+                exp_generator(i.get_child(0));
+            } else {
+                exp_generator(i.get_child(0));
+                exp_generator(i.get_child(1));
+            }
+            stream << "invokevirtual dlvc/LuaTable/set("
+                   << luaTypeDescriptor << luaTypeDescriptor << ")V"
+                   << std::endl;
+        }
     };
 
     call_analyser = [&] (node& call_node) {
@@ -260,7 +283,9 @@ void gen_block_code(node& n, std::stringstream& stream,
 
     exp_generator = [&] (node& exp) {
         for (auto& i : exp.children) {
-            exp_generator(i);
+            // table_entry não é uma expressão
+            if (i.kind != NodeKind::table_entry)
+                exp_generator(i);
         }
 
         #define o(OP)\
@@ -360,6 +385,12 @@ void gen_block_code(node& n, std::stringstream& stream,
                 stream << "new dlvc/LuaNil" << std::endl;
                 stream << "dup" << std::endl;
                 stream << "invokespecial dlvc/LuaNil/<init>()V" << std::endl;
+                break;
+            case NodeKind::str_val:
+                stream << "new dlvc/LuaString" << std::endl;
+                stream << "dup" << std::endl;
+                stream << "ldc " << '\"' << exp.s_data << '\"' << std::endl;
+                stream << "invokespecial dlvc/LuaString/<init>(Ljava/lang/String;)V" << std::endl;
                 break;
             case NodeKind::var_use:
                 local_number = varToLocal.at(var_name);

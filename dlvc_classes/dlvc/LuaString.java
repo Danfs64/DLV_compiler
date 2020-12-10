@@ -1,7 +1,7 @@
 package dlvc;
 
 
-class LuaString implements LuaType {
+public class LuaString implements LuaType {
     protected String luastring;
 
     public LuaString(String s) {
