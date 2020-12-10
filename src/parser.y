@@ -261,6 +261,8 @@ stat:
         ASSIGN_AND_CLEAR();
         global::assign_list_type = list_type::VARLIST;
 
+        // AST
+        $$ = node();
         $$.add_child(std::move($1));
         $$.add_child(std::move($4));
         $$.kind = NodeKind::assign;
@@ -404,8 +406,8 @@ funcname:
 ;
 
 varlist:
-    var              { $$ = std::move($1); $$.kind = NodeKind::var_use; }
-|   varlist "," var  { $1.add_child(std::move($3)); $$ = std::move($1); $$.kind = NodeKind::var_list; }
+    var              { $$ = node();  $$.add_child(std::move($1)); $$.kind = NodeKind::var_list; }
+|   varlist "," var  { $1.add_child(std::move($3)); $$ = std::move($1); }
 
 var:
     IDENTIFIER {
