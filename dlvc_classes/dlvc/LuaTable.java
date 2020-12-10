@@ -14,6 +14,10 @@ public class LuaTable implements LuaType {
         map.put(obj1, obj2);
     }
 
+    public void put(LuaType obj1, LuaType obj2) {
+        map.put(obj1, obj2);
+    }
+
     public boolean boolValue() {
         return true;
     }

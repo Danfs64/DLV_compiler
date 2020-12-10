@@ -12,6 +12,15 @@ public class LuaNumber implements LuaType {
        return number.hashCode(); 
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof LuaNumber) {
+            LuaNumber ol = (LuaNumber) o;
+            return Double.compare(this.number, ol.number) == 0;
+        }
+        return false;
+    }
+
     public void print() {
         System.out.println(number);
     }
