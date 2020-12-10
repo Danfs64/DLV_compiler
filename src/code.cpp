@@ -411,7 +411,11 @@ void gen_block_code(node& n, std::stringstream& stream,
                 stream << o("or") << std::endl;
                 break;
             case NodeKind::bnot:
-                stream << o("bnot") << std::endl;
+                if (exp.get_child_count() == 1) {
+                    stream << o("bnot") << std::endl;
+                } else {
+                    stream << o("bxor") << std::endl;
+                }
                 break;
             case NodeKind::band:
                 stream << o("band") << std::endl;
