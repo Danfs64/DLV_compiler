@@ -533,7 +533,12 @@ call:
         TRY_INDEX($$, $1, call_node);
         $$.kind = NodeKind::index;
     }
-|   var args                       { TRY_CALL($$, $1); $$.add_child(std::move($2)); $$.kind = NodeKind::call; }
+|   var args                       {
+        TRY_CALL($$, $1);
+        $$.add_child(std::move($1));
+        $$.add_child(std::move($2));
+        $$.kind = NodeKind::call;
+    }
 |   var ":" IDENTIFIER args        {
         auto call_node = node(NodeKind::index, luae(luat::STR));
         TRY_INDEX($$, $1, call_node);
@@ -544,7 +549,14 @@ call:
 ;
 
 args:
-    "(" { STORE_LIST_TYPE(); TO_EXPLIST(); global::is_args = true; } opt_explist ")" { RESTORE_LIST_TYPE(); global::is_args = false; }
+    "(" { STORE_LIST_TYPE(); TO_EXPLIST(); global::is_args = true; } opt_explist ")" {
+        RESTORE_LIST_TYPE();
+        global::is_args = false;
+
+        // AST
+        $$ = node();
+        $$ = std::move($3);
+    }
 |   tableconstructor
 |   STRINGCONST
 ;
