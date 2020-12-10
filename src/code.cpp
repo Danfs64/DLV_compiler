@@ -75,10 +75,34 @@ void gen_block_code(node& n) {
     std::function<void(node&)> block_analyser;
     std::function<void(node&)> if_analyser;
     std::function<void(node&)> for_analyser;
+    std::function<void(node&)> while_analyser;
+    std::function<void(node&)> assign_analyser;
     std::function<void(node&)> exp_generator;
     std::map<std::string, int> varToLocal;
     int total_labels = 1;
     int total_vars = 1;
+
+    assign_analyser = [&] (node& assign_node) {
+    };
+
+    while_analyser = [&] (node& while_node) {
+        std::string while_exit_label = "EXIT_LABEL" + std::to_string(total_labels);
+        std::string while_start_label = "START_LABEL" + std::to_string(total_labels);
+        total_labels++;
+        node& exp = while_node.children.at(0);
+        node& block_node = while_node.children.at(1);
+
+        stream << while_start_label << ":" << std::endl;
+        stream << " ; while expression" << std::endl;
+        exp_generator(exp);
+        stream << "invokeinterface dlvc/LuaType/boolValue()Z 1" << std::endl;
+        stream << "ifeq " << while_exit_label << std::endl; // Se o valor retornado for 0 (falso) ir para label
+
+        stream << "\t ; [WHILE] block start" << std::endl;
+        block_analyser(block_node);
+        stream << "goto " << while_start_label << std::endl;
+        stream << while_exit_label << ":" << std::endl;
+    };
 
     if_analyser = [&] (node& if_node) {
         node& if_exp = if_node.children[0];
@@ -197,11 +221,29 @@ void gen_block_code(node& n) {
             case NodeKind::cat:
                 stream << o("cat") << std::endl;
                 break;
+            case NodeKind::len:
+                stream << o("len") << std::endl;
+                break;
             case NodeKind::and_:
                 stream << o("and") << std::endl;
                 break;
             case NodeKind::or_:
                 stream << o("or") << std::endl;
+                break;
+            case NodeKind::bnot:
+                stream << o("bnot") << std::endl;
+                break;
+            case NodeKind::band:
+                stream << o("band") << std::endl;
+                break;
+            case NodeKind::bor:
+                stream << o("bor") << std::endl;
+                break;
+            case NodeKind::rshift:
+                stream << o("rshift") << std::endl;
+                break;
+            case NodeKind::lshift:
+                stream << o("lshift") << std::endl;
                 break;
             case NodeKind::gt:
                 stream << o("gt") << std::endl;
@@ -288,6 +330,12 @@ void gen_block_code(node& n) {
                 break;
             case NodeKind::for_:
                 for_analyser(n);
+                break;
+            case NodeKind::while_:
+                while_analyser(n);
+                break;
+            case NodeKind::assign:
+                assign_analyser(n);
                 break;
             case NodeKind::BLOCK:
                 std::exit(254);
