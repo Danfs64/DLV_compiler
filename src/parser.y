@@ -167,12 +167,14 @@ opt_comma_exp:
 ;
 
 opt_parlist:
-    %empty
+    %empty   { $$ = node(); }
 |   parlist  {
         for (const auto& name : global::namelist) {
             add_symbol_last_scope(name, yylineno, lua_things::Type::TABLE);
         }
         global::namelist.clear();
+
+        $$ = std::move($1);
     }
 ;
 
@@ -267,7 +269,7 @@ stat:
         $$.add_child(std::move($4));
         $$.kind = NodeKind::assign;
     }
-|   call                            %prec ";"                    { CLEAR_NAME_EXP(); } 
+|   call                            %prec ";"                    { CLEAR_NAME_EXP(); $$ = std::move($1); } 
 |   label
 |   "break" { if(!ctx.verify_break()) { error_break(); } }
 |   "goto" IDENTIFIER { ctx.add_goto_call(global::last_identifier); }
@@ -342,6 +344,10 @@ stat:
     } funcbody {
         ctx.verify_goto_calls();
         ctx.remove_scope();
+
+        $$.kind = NodeKind::func_def;
+        $$.add_child(std::move($2));
+        $$.add_child(std::move($4));
     }
 |   "local" "function" IDENTIFIER {
         add_symbol_last_scope(global::last_identifier, yylineno, lua_things::Type::FUNCTION);
@@ -357,14 +363,14 @@ stat:
 
         // AST
         // Fix node list
-        auto tmp = std::move($3);
-        auto tmp_list = std::move(tmp.children);
-        $3 = node();
-        $3.add_child(std::move(tmp));
-        for (auto& i : tmp_list) {
-            $3.add_child(std::move(i));
-        }
-        $3.kind = NodeKind::var_list;
+        // auto tmp = std::move($3);
+        // auto tmp_list = std::move(tmp.children);
+        // $3 = node();
+        // $3.add_child(std::move(tmp));
+        // for (auto& i : tmp_list) {
+        //     $3.add_child(std::move(i));
+        // }
+        // $3.kind = NodeKind::var_list;
     } opt_eq_explist {
         ASSIGN_AND_CLEAR();
         #ifdef DLVCDEBUG
@@ -377,16 +383,6 @@ stat:
         $$.kind = NodeKind::var_decl;
         $$.add_child(std::move($3));
         if ($5.kind != NodeKind::NO_KIND) {
-            //Fix explist
-            // auto tmp = std::move($5);
-            // auto tmp_list = std::move(tmp.children.back());
-            // $5 = node();
-            // $5.add_child(std::move(tmp));
-            // for (auto& i : tmp_list) {
-            //     $5.add_child(std::move(i));
-            // }
-            // $5.kind = NodeKind::exp_list;
-            // std::cout << $5.children.size() << std::endl;
             $$.add_child(std::move($5));
         }
     }
@@ -402,6 +398,12 @@ label:
 funcname:
     IDENTIFIER { global::full_funcname.emplace_back(global::last_identifier); } loop_dot_name opt_col_name  {
         $$.expr = add_func();
+        std::string funcname = "";
+        for (auto& i : global::full_funcname) {
+            funcname += i;
+        }
+        $$.kind = NodeKind::func_name;
+        $$.expr.name = std::move(funcname);
     }
 ;
 
@@ -475,8 +477,14 @@ namelist:
         // AST
         auto expr = luae();
         expr.name = global::last_identifier;
-        $$ = node(NodeKind::var_name, expr);
-        $$.kind = NodeKind::var_name;
+        // $$ = node(NodeKind::var_name, expr);
+        // $$.kind = NodeKind::var_name;
+        $$ = node();
+        $$.kind = NodeKind::var_list;
+        node new_node = node();
+        new_node.kind = NodeKind::var_name;
+        new_node.expr = expr;
+        $$.add_child(std::move(new_node));
     }
 |   namelist "," IDENTIFIER    {
         add_namelist(global::last_identifier);
@@ -515,7 +523,11 @@ primary:
 ;
 
 call:
-    primary args                   { TRY_CALL($$, $1); $$.add_child(std::move($2)); $$.kind = NodeKind::call; }
+    primary args                   {
+        TRY_CALL($$, $1);
+        $$.add_child(std::move($2));
+        $$.kind = NodeKind::call;
+    }
 |   primary ":" IDENTIFIER args    {
         auto call_node = node(NodeKind::index, luae(luat::STR));
         TRY_INDEX($$, $1, call_node);
@@ -542,11 +554,16 @@ functiondef:
 ;
 
 funcbody:
-    "(" opt_parlist ")" block "end"
+    "(" opt_parlist ")" block "end"  {
+        $$ = node();
+        $$.kind = NodeKind::func_body;
+        $$.add_child(std::move($2)); // args
+        $$.add_child(std::move($4)); // block
+    }
 ;
 
 parlist:
-   namelist opt_comma_elip   
+   namelist opt_comma_elip   { $$ = std::move($1); }
 |  "..."                     { add_namelist("..."); }
 ;
 

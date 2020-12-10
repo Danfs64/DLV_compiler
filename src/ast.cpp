@@ -89,6 +89,8 @@ const char* kind2str(NodeKind kind) {
         case NodeKind::for_:      return "for =";
         case NodeKind::for_in:    return "for in";
         case NodeKind::func_def:  return "function";
+        case NodeKind::func_body: return "function body";
+        case NodeKind::func_name: return "function name";
         case NodeKind::ge:        return ">=";
         case NodeKind::gt:        return ">";
         case NodeKind::if_:       return "if";
@@ -266,6 +268,10 @@ int node::print_node_dot() {
             break;
         case NodeKind::str_val:
             name_str += "@" + s_data;
+            std::fprintf(stderr, label_template, my_nr, name_str.c_str());
+            break;
+        case NodeKind::func_name:
+            name_str += "@" + expr.name;
             std::fprintf(stderr, label_template, my_nr, name_str.c_str());
             break;
         default:
