@@ -202,6 +202,7 @@ void gen_block_code(node& n, std::stringstream& stream,
     };
 
     assign_analyser = [&] (node& assign_node) {
+        stream << " ; ASSIGN" << std::endl;
         node& var_list = assign_node.children.at(0);
         node& exp_list = assign_node.children.at(1);
 
@@ -302,7 +303,6 @@ void gen_block_code(node& n, std::stringstream& stream,
         std::string for_start_label = "LABEL" + std::to_string(total_labels);
         total_labels++; 
 
-        stream << for_start_label << ":" << std::endl;
 
         if (for_node.get_child_count() == 5) {
             custom_inc = true;
@@ -317,6 +317,7 @@ void gen_block_code(node& n, std::stringstream& stream,
         total_vars++;
         stream << "astore " << std::to_string(var_label_num) << " ; " << var_node.expr.name << std::endl;
 
+        stream << for_start_label << ":" << std::endl;
         // BLOCK code
         stream << " ; for loop block" << std::endl;
         if (custom_inc) {
@@ -326,6 +327,8 @@ void gen_block_code(node& n, std::stringstream& stream,
             node& block_node = for_node.children.at(3);
             block_analyser(block_node);
         }
+        // node& block_node = for_node.children.at(custom_inc ? 4 : 3);
+        // block_analyser(block_node);
 
         // Increment
         stream << "aload " + std::to_string(var_label_num) << " ; " << var_node.expr.name << std::endl;
@@ -352,7 +355,7 @@ void gen_block_code(node& n, std::stringstream& stream,
         stream << "invokestatic dlvc/LuaOpResolver/gt(Ldlvc/LuaType;Ldlvc/LuaType;)Ldlvc/LuaType;"
                << std::endl;
         stream << "invokeinterface dlvc/LuaType/boolValue()Z 1" << std::endl;
-        stream << "ifne " << for_start_label << std::endl; // Se o valor retornado for 0 (falso) sair do for
+        stream << "ifeq " << for_start_label << std::endl; // Se o valor retornado for 0 (falso) sair do for
     };
 
     exp_generator = [&] (node& exp) {
@@ -370,6 +373,11 @@ void gen_block_code(node& n, std::stringstream& stream,
             OP                                              \
             "(Ldlvc/LuaType;Ldlvc/LuaType;)Ldlvc/LuaType; " \
 
+        #define u(OP)\
+            "invokestatic dlvc/LuaOpResolver/"              \
+            OP                                              \
+            "(Ldlvc/LuaType;)Ldlvc/LuaType; " \
+
         std::string& var_name = exp.expr.name;
         int local_number = -1;
         switch (exp.kind) {
@@ -380,7 +388,7 @@ void gen_block_code(node& n, std::stringstream& stream,
                 if (exp.get_child_count() == 2) {
                     stream << o("minus") << std::endl;
                 } else {
-                    stream << "invokevirtual dlvc/LuaNumber/negate()Ldlvc/LuaType;" << std::endl;
+                    stream << "invokestatic dlvc/LuaOpResolver/negative(Ldlvc/LuaType;)Ldlvc/LuaType; " << std::endl;
                 }
                 break;
             case NodeKind::times:
@@ -404,6 +412,9 @@ void gen_block_code(node& n, std::stringstream& stream,
             case NodeKind::len:
                 stream << o("len") << std::endl;
                 break;
+            case NodeKind::not_:
+                stream << o("not") << std::endl;
+                break;
             case NodeKind::and_:
                 stream << o("and") << std::endl;
                 break;
@@ -412,7 +423,7 @@ void gen_block_code(node& n, std::stringstream& stream,
                 break;
             case NodeKind::bnot:
                 if (exp.get_child_count() == 1) {
-                    stream << o("bnot") << std::endl;
+                    stream << "invokestatic dlvc/LuaOpResolver/bnot(Ldlvc/LuaType;)Ldlvc/LuaType; " << std::endl;
                 } else {
                     stream << o("bxor") << std::endl;
                 }
@@ -486,6 +497,7 @@ void gen_block_code(node& n, std::stringstream& stream,
                 break;
         }
 
+        #undef u
         #undef o
     };
 
