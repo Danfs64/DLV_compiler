@@ -388,7 +388,7 @@ void gen_block_code(node& n, std::stringstream& stream,
                 if (exp.get_child_count() == 2) {
                     stream << o("minus") << std::endl;
                 } else {
-                    stream << "invokestatic dlvc/LuaOpResolver/negative(Ldlvc/LuaType;)Ldlvc/LuaType; " << std::endl;
+                    stream << u("negative") << std::endl;
                 }
                 break;
             case NodeKind::times:
@@ -410,10 +410,10 @@ void gen_block_code(node& n, std::stringstream& stream,
                 stream << o("cat") << std::endl;
                 break;
             case NodeKind::len:
-                stream << o("len") << std::endl;
+                stream << u("len") << std::endl;
                 break;
             case NodeKind::not_:
-                stream << o("not") << std::endl;
+                stream << u("not") << std::endl;
                 break;
             case NodeKind::and_:
                 stream << o("and") << std::endl;
@@ -423,7 +423,7 @@ void gen_block_code(node& n, std::stringstream& stream,
                 break;
             case NodeKind::bnot:
                 if (exp.get_child_count() == 1) {
-                    stream << "invokestatic dlvc/LuaOpResolver/bnot(Ldlvc/LuaType;)Ldlvc/LuaType; " << std::endl;
+                    stream << u("bnot") << std::endl;
                 } else {
                     stream << o("bxor") << std::endl;
                 }
