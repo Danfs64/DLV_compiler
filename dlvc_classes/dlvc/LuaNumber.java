@@ -25,8 +25,13 @@ public class LuaNumber implements LuaType {
         System.out.println(number);
     }
 
+    @Override
     public String toString() {
-        return String.valueOf(number);
+        if (number > Math.floor(number)) {
+            return String.valueOf(number);
+        } else {
+            return String.valueOf(number.longValue());
+        }
     }
 
     public boolean boolValue() {

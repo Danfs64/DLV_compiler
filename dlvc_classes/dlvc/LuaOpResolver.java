@@ -45,6 +45,11 @@ public class LuaOpResolver {
         return op_calculator.calculate(lhs, rhs);
     }
 
+    static public LuaType negative(LuaType lhs) {
+        OpInterface op_calculator = (Double a, Double b) -> -a;
+        return op_calculator.calculate(lhs, lhs);
+    }
+
     static public LuaType times(LuaType lhs, LuaType rhs) {
         OpInterface op_calculator = (Double a, Double b) -> a * b;
         return op_calculator.calculate(lhs, rhs);
@@ -83,7 +88,7 @@ public class LuaOpResolver {
         if (rhs instanceof LuaNumber) {
             rhsn = String.valueOf(((LuaNumber) rhs).number);
         } else if (rhs instanceof LuaString) {
-            rhsn = ((LuaString) lhs).luastring;
+            rhsn = ((LuaString) rhs).luastring;
         }
 
         if (lhsn == null || rhsn == null) return new LuaNil();
@@ -113,43 +118,43 @@ public class LuaOpResolver {
     }
 
     static public LuaType bnot(LuaType lhs) {
-        OpInterface op_calculator = (Double a, Double b) -> Double.longBitsToDouble(
-            ~ Double.doubleToLongBits(a)
+        OpInterface op_calculator = (Double a, Double b) -> (
+            (double) (~ a.longValue())
         );
         return op_calculator.calculate(lhs, lhs);
     }
 
     static public LuaType band(LuaType lhs, LuaType rhs) {
-        OpInterface op_calculator = (Double a, Double b) -> Double.longBitsToDouble(
-            Double.doubleToLongBits(a) & Double.doubleToLongBits(b)
+        OpInterface op_calculator = (Double a, Double b) -> (
+            (double) (a.longValue() & b.longValue())
         );
         return op_calculator.calculate(lhs, rhs);
     }
 
     static public LuaType bor(LuaType lhs, LuaType rhs) {
-        OpInterface op_calculator = (Double a, Double b) -> Double.longBitsToDouble(
-            Double.doubleToLongBits(a) | Double.doubleToLongBits(b)
+        OpInterface op_calculator = (Double a, Double b) -> (
+            (double) (a.longValue() | b.longValue())
         );
         return op_calculator.calculate(lhs, rhs);
     }
 
     static public LuaType bxor(LuaType lhs, LuaType rhs) {
-        OpInterface op_calculator = (Double a, Double b) -> Double.longBitsToDouble(
-            Double.doubleToLongBits(a) ^ Double.doubleToLongBits(b)
+        OpInterface op_calculator = (Double a, Double b) -> (
+            (double) (a.longValue() ^ b.longValue())
         );
         return op_calculator.calculate(lhs, rhs);
     }
 
     static public LuaType rshift(LuaType lhs, LuaType rhs) {
-        OpInterface op_calculator = (Double a, Double b) -> Double.longBitsToDouble(
-            Double.doubleToLongBits(a) >> Double.doubleToLongBits(b)
+        OpInterface op_calculator = (Double a, Double b) -> (
+            (double) (a.longValue() >> b.longValue())
         );
         return op_calculator.calculate(lhs, rhs);
     }
 
     static public LuaType lshift(LuaType lhs, LuaType rhs) {
-        OpInterface op_calculator = (Double a, Double b) -> Double.longBitsToDouble(
-            Double.doubleToLongBits(a) << Double.doubleToLongBits(b)
+        OpInterface op_calculator = (Double a, Double b) -> (
+            (double) (a.longValue() << b.longValue())
         );
         return op_calculator.calculate(lhs, rhs);
     }
