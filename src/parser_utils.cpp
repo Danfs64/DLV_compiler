@@ -277,6 +277,7 @@ void add_builtin() {
         std::tuple{"_G",             lua_things::Type::TABLE   },
         std::tuple{"pairs",          lua_things::Type::FUNCTION},
         std::tuple{"rawlen",         lua_things::Type::FUNCTION},
+        std::tuple{"read",           lua_things::Type::FUNCTION},
     };
 
     for (const auto &[id, type] : builtin) {

@@ -321,13 +321,15 @@ stat:
         std::cerr << "for_init_id: " << global::for_init_id << std::endl;
         #endif
         add_symbol_last_scope(global::for_init_id, yylineno, ($5).expr.type);
+
+        $1.expr.name = global::for_init_id;
     } block "end" {
         REMOVE_SCOPE();
 
         // AST
         node id_node = node();
         id_node.kind = NodeKind::var_name;
-        id_node.expr.name = global::for_init_id;
+        id_node.expr.name = $1.expr.name;
         id_node.expr.type = $5.expr.type;
         
         $$.kind = NodeKind::for_;
@@ -705,7 +707,7 @@ int main(void) {
         return 1;
     }
 
-    root.print_dot();
+    // root.print_dot();
     generate_code(root);
     return 0;
 }

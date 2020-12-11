@@ -1,5 +1,7 @@
 package dlvc;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 // import java.util.Objects;
 // import java.util.Map;
 // import java.util.HashMap;
@@ -34,6 +36,19 @@ public class LuaOpResolver {
     /**
      * TODO: Converter string para double
      */
+
+    static public LuaType readLine() {
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(System.in));
+        try {
+            String name = reader.readLine();
+            return new LuaString(name);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        // System.out.println(name); 
+        return new LuaNil();
+    }
 
     static public LuaType plus(LuaType lhs, LuaType rhs) {
         OpInterface op_calculator = (Double a, Double b) -> a + b;

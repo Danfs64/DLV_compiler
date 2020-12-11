@@ -20,7 +20,7 @@
 
 namespace fs = std::filesystem;
 
-static fs::path jasmin_path = "cuspido2.j";
+static fs::path jasmin_path = "jasminout.j";
 static std::ofstream fstream(jasmin_path);
 static const char* luaTypeDescriptor = "Ldlvc/LuaType;";
 
@@ -41,6 +41,17 @@ invokevirtual java/io/PrintStream/println(Ljava/lang/Object;)V
 new dlvc/LuaNil
 dup
 invokespecial dlvc/LuaNil/<init>()V
+areturn
+.end method
+)";
+
+static const char* read_jasmin = R"(
+.method public static read()Ldlvc/LuaType;
+.limit locals 10
+.limit stack 10
+
+invokestatic dlvc/LuaOpResolver/readLine()Ldlvc/LuaType;
+
 areturn
 .end method
 )";
@@ -76,6 +87,7 @@ void generate_code(node& root) {
     }
 
     fstream << print_jasmin << std::endl;
+    fstream << read_jasmin << std::endl;
 }
 
 void gen_block_code(node& n, std::stringstream& stream,
@@ -155,14 +167,18 @@ void gen_block_code(node& n, std::stringstream& stream,
 
     call_analyser = [&] (node& call_node) {
         std::string& fname = call_node.get_child(0).expr.name;
-        node& exp_list = call_node.get_child(1);
-        for (auto& i : exp_list.children)
-            exp_generator(i);
+        if (call_node.get_child_count() > 1) {
+            node& exp_list = call_node.get_child(1);
+            for (auto& i : exp_list.children)
+                exp_generator(i);
 
-        stream << "invokestatic Jasmin/" << fname << "(";
-        for (int i = 0; i < exp_list.get_child_count(); ++i)
-            stream << luaTypeDescriptor;
-        stream << ")" << luaTypeDescriptor << std::endl;
+            stream << "invokestatic Jasmin/" << fname << "(";
+            for (int i = 0; i < exp_list.get_child_count(); ++i)
+                stream << luaTypeDescriptor;
+            stream << ")" << luaTypeDescriptor << std::endl;
+        } else {
+            stream << "invokestatic Jasmin/" << fname << "(" << ")" << luaTypeDescriptor << std::endl;;
+        }
     };
 
     return_analyser = [&] (node& return_node) {
