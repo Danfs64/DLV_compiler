@@ -460,14 +460,26 @@ var:
             }
             $$.expr.name = global::last_identifier;
         } else {
+            $$ = node();
             auto expr = lua_things::expression(lua_things::Type::TABLE);
             $$ = node(NodeKind::var_use, expr);
+            $$.expr.name = global::last_identifier;
         }
     }
-|   primary { global::is_index = true; } index { global::is_index = false; TRY_INDEX($$, $1, $2); }
+|   primary { global::is_index = true; } index {
+        global::is_index = false;
+        TRY_INDEX($$, $1, $2);
+
+        // AST
+        $$ = node();
+        $1.add_child(std::move($3));
+        $$ = std::move($1);
+    }
 |   var     { global::is_index = true; } index {
         global::is_index = false;
         TRY_INDEX($$, $1, $2);
+
+        $$ = node();
         $1.add_child(std::move($3));
         $$ = std::move($1);
     }
@@ -481,7 +493,7 @@ var:
 ;
 
 index:
-    "[" { global::lock_list = true; } exp { global::lock_list = false; } "]"    { $$ = std::move($2); pop_namelist(); add_namelist(global::null_identifier); }
+    "[" { global::lock_list = true; } exp { global::lock_list = false; } "]"    { $$ = std::move($3); pop_namelist(); add_namelist(global::null_identifier); }
 |   "." IDENTIFIER    {
         $$.kind = NodeKind::str_val;
         $$.s_data = global::last_identifier;
