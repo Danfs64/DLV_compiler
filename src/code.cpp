@@ -15,6 +15,9 @@
     stream << "astore " << std::to_string(I) \
            << " ; " << N << std::endl;
 
+#define BOOLVALUE() \
+    stream << "invokeinterface dlvc/LuaType/boolValue()Z 1" << std::endl;
+
 namespace fs = std::filesystem;
 
 static fs::path jasmin_path = "cuspido2.j";
@@ -51,9 +54,9 @@ const char* jasmin_start = R"(
 )";
 
 const char* jasmin_end = R"(
-    getstatic java/lang/System/out Ljava/io/PrintStream;
-    aload 0
-    invokevirtual java/io/PrintStream/println(Ljava/lang/Object;)V
+    ; getstatic java/lang/System/out Ljava/io/PrintStream;
+    ; aload 0
+    ; invokevirtual java/io/PrintStream/println(Ljava/lang/Object;)V
     return	
 .end method
 )";
@@ -88,11 +91,24 @@ void gen_block_code(node& n, std::stringstream& stream,
     std::function<void(node&)> call_analyser;
     std::function<void(node&)> var_use_analyser;
     std::function<void(node&)> return_analyser;
+    std::function<void(node&)> repeat_analyser;
     std::function<void(node&)> exp_generator;
     std::function<void(node&)> table_generator;
     int total_labels = 1;
     int total_vars = varToLocal.size() + 1;
 
+
+    repeat_analyser = [&] (node& repeat_node) {
+        std::string repeat_start_label = "LABEL" + std::to_string(total_labels++);
+        node& block = repeat_node.get_child(0);
+        node& until = repeat_node.get_child(1);
+
+        stream << repeat_start_label << ":" << std::endl;
+        block_analyser(block);
+        exp_generator(until);
+        BOOLVALUE();
+        stream << "ifeq " << repeat_start_label << std::endl;
+    };
 
     var_use_analyser = [&] (node& var_node) {
         std::string& var_name = var_node.expr.name;
@@ -263,13 +279,14 @@ void gen_block_code(node& n, std::stringstream& stream,
         node& if_exp = if_node.children[0];
         node& if_block = if_node.children[1];
         std::string if_label_name = "LABEL" + std::to_string(total_labels);
-        total_labels++;
+        std::string if_exit_label = "IF_EXIT_LABEL" + std::to_string(total_labels++);
 
         exp_generator(if_exp);
         stream << "invokeinterface dlvc/LuaType/boolValue()Z 1" << std::endl;
         stream << "ifeq " << if_label_name << std::endl; // Se o valor retornado for 0 (falso) ir para label
         // total_labels++;
         block_analyser(if_block);
+        stream << "goto " << if_exit_label << std::endl;
         stream << if_label_name << ":" << std::endl;
 
         // Ver elseif-else
@@ -286,6 +303,7 @@ void gen_block_code(node& n, std::stringstream& stream,
                     stream << "invokeinterface dlvc/LuaType/boolValue()Z 1" << std::endl;
                     stream << "ifeq " << i_label_name << std::endl;
                     block_analyser(i_block);
+                    stream << "goto " << if_exit_label << std::endl;
                     stream << i_label_name << ":" << std::endl;
                 } else {
                     node& i_block = i.get_child(0);
@@ -293,6 +311,7 @@ void gen_block_code(node& n, std::stringstream& stream,
                 }
             }
         }
+        stream << if_exit_label << ":" << std::endl;
     };
 
     for_analyser = [&] (node& for_node) {
@@ -557,6 +576,9 @@ void gen_block_code(node& n, std::stringstream& stream,
                 break;
             case NodeKind::return_:
                 return_analyser(n);
+                break;
+            case NodeKind::repeat:
+                repeat_analyser(n);
                 break;
             case NodeKind::call:
                 call_analyser(n);
