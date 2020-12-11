@@ -114,13 +114,15 @@ void gen_block_code(node& n, std::stringstream& stream,
         std::string& var_name = var_node.expr.name;
         int local_number = varToLocal.at(var_name);
         stream << "aload " << local_number << " ; " << var_name << std::endl;
-        if (var_node.get_child_count() > 0) { // É uma tabela
+        if (var_node.get_child_count() == 1) { // É uma tabela
             node& child = var_node.get_child(0);
             exp_generator(child);
             // stream << "new dlvc/LuaString" << std::endl;
             // stream << "ldc " << child.expr.name << std::endl;
             // stream << "invokespecial dlvc/LuaString/<init>(Ljava/lang/String;)V" << std::endl;
-            stream << "invokevirtual dlvc/LuaTable/get(Ldlvc/LuaType;)Ldlvc/LuaType; " << std::endl;
+            stream << "invokestatic dlvc/LuaTable/get(Ldlvc/LuaType;Ldlvc/LuaType;)Ldlvc/LuaType; " << std::endl;
+        } else {
+            // stream << "aload " << varToLocal[var_name]  << std::endl;
         }
     };
 
@@ -240,7 +242,7 @@ void gen_block_code(node& n, std::stringstream& stream,
                 while (start_node->get_child_count() > 0) {
                     exp_generator(*start_node);
                     // stream << "ldc " << start_node->expr.name << std::endl;
-                    stream << "invokevirtual dlvc/LuaTable/get(Ldlvc/LuaType;)Ldlvc/LuaType; "
+                    stream << "invokestatic dlvc/LuaTable/get(Ldlvc/LuaType;Ldlvc/LuaType;)Ldlvc/LuaType; "
                            << std::endl;
                     start_node = &start_node->get_child(0);
                 }
@@ -248,7 +250,7 @@ void gen_block_code(node& n, std::stringstream& stream,
                 exp_generator(*start_node);
                 // stream << "ldc " << start_node->expr.name << std::endl;
                 stream << "swap ; Mantém a expressão acima da string" << std::endl;
-                stream << "invokevirtual dlvc/LuaTable/put(Ldlvc/LuaType;Ldlvc/LuaType;)V"
+                stream << "invokestatic dlvc/LuaTable/put(Ldlvc/LuaType;Ldlvc/LuaType;Ldlvc/LuaType;)V "
                        << std::endl;
             } else {
                 ASTORE(local, var_name);
@@ -290,6 +292,7 @@ void gen_block_code(node& n, std::stringstream& stream,
         stream << if_label_name << ":" << std::endl;
 
         // Ver elseif-else
+        
         if (if_node.get_child_count() > 2) {
             for (auto iter = std::begin(if_node.children) + 2;
                  iter != std::end(if_node.children);
@@ -311,6 +314,7 @@ void gen_block_code(node& n, std::stringstream& stream,
                 }
             }
         }
+        
         stream << if_exit_label << ":" << std::endl;
     };
 
@@ -321,7 +325,6 @@ void gen_block_code(node& n, std::stringstream& stream,
         node& exp2 = for_node.children.at(2);
         std::string for_start_label = "LABEL" + std::to_string(total_labels);
         total_labels++; 
-
 
         if (for_node.get_child_count() == 5) {
             custom_inc = true;
